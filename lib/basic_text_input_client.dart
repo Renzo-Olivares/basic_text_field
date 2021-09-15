@@ -113,8 +113,9 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
 
     return Column(
       children: <Widget>[
+        const SizedBox(height: 10),
         DeltaDisplay(delta: lastTextEditingDelta),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         FocusTrapArea(
           focusNode: widget.focusNode,
           child: GestureDetector(
@@ -122,7 +123,7 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
             onTapUp: _tapUp,
             child: Container(
               width: 350,
-              height: 200,
+              height: 150,
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.blueAccent),
                 borderRadius: BorderRadius.circular(4),
