@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -66,6 +67,11 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
       _textKey.currentContext?.findRenderObject() as RenderParagraph;
   Rect _caretRect = Rect.zero;
 
+  TextEditingDelta lastTextEditingDelta = TextEditingDeltaNonTextUpdate(
+      oldText: '',
+      selection: TextSelection.collapsed(offset: -1),
+      composing: TextRange.empty);
+
   @override
   void initState() {
     super.initState();
@@ -105,39 +111,45 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
   Widget build(BuildContext context) {
     _focusAttachment!.reparent();
 
-    return FocusTrapArea(
-      focusNode: widget.focusNode,
-      child: GestureDetector(
-        onTap: _requestKeyboard,
-        onTapUp: _tapUp,
-        child: Container(
-          width: 400,
-          height: 400,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.blueAccent),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Stack(
-            children: [
-              Text.rich(
-                widget.controller
-                    .buildTextSpan(context: context, withComposing: true),
-                key: _textKey,
-                style: widget.style,
-                textDirection: widget.textDirection,
-                textAlign: widget.textAlign,
-                maxLines: widget.maxLines,
+    return Column(
+      children: <Widget>[
+        DeltaDisplay(delta: lastTextEditingDelta),
+        SizedBox(height: 20),
+        FocusTrapArea(
+          focusNode: widget.focusNode,
+          child: GestureDetector(
+            onTap: _requestKeyboard,
+            onTapUp: _tapUp,
+            child: Container(
+              width: 350,
+              height: 200,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.blueAccent),
+                borderRadius: BorderRadius.circular(4),
               ),
-              CustomPaint(
-                painter: _CustomTextOverlayPainter(
-                  color: Colors.blueAccent,
-                  rects: <Rect>[_caretRect],
-                ),
+              child: Stack(
+                children: [
+                  Text.rich(
+                    widget.controller
+                        .buildTextSpan(context: context, withComposing: true),
+                    key: _textKey,
+                    style: widget.style,
+                    textDirection: widget.textDirection,
+                    textAlign: widget.textAlign,
+                    maxLines: widget.maxLines,
+                  ),
+                  CustomPaint(
+                    painter: _CustomTextOverlayPainter(
+                      color: Colors.blueAccent,
+                      rects: <Rect>[_caretRect],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -377,19 +389,7 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
     TextEditingValue value = _value;
 
     for (final TextEditingDelta delta in textEditingDeltas) {
-      print('Delta class type: ' + delta.runtimeType.toString());
-      print('Delta type: ' + delta.deltaType.toString());
-      print('Delta old text: ' + delta.oldText);
-      print('Delta new text: ' + delta.deltaText);
-      print(
-          'Delta beginning of new range: ' + delta.deltaRange.start.toString());
-      print('Delta end of new range: ' + delta.deltaRange.end.toString());
-      print('Delta beginning of new selection: ' +
-          delta.selection.start.toString());
-      print('Delta end of new selection: ' + delta.selection.end.toString());
-      print('Delta beginning of new composing: ' +
-          delta.composing.start.toString());
-      print('Delta end of new composing: ' + delta.composing.end.toString());
+      lastTextEditingDelta = delta;
       value = delta.apply(value);
     }
 
@@ -430,5 +430,121 @@ class _CustomTextOverlayPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return true;
+  }
+}
+
+class DeltaDisplay extends StatelessWidget {
+  const DeltaDisplay({required this.delta});
+  final TextEditingDelta delta;
+
+  @override
+  Widget build(BuildContext context) {
+    const TextStyle textStyle = TextStyle(fontWeight: FontWeight.bold);
+    final TextEditingDelta lastTextEditingDelta = delta;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Delta class type: ' +
+              lastTextEditingDelta.runtimeType.toString(),
+          style: textStyle,
+        ),
+        Text(
+          'Delta old text: ' + lastTextEditingDelta.oldText,
+          style: textStyle,
+        ),
+        if (lastTextEditingDelta is TextEditingDeltaInsertion)
+          Text(
+            'Delta inserted text: ' +
+                (lastTextEditingDelta as TextEditingDeltaInsertion)
+                    .textInserted,
+            style: textStyle,
+          ),
+        if (lastTextEditingDelta is TextEditingDeltaInsertion)
+          Text(
+            'Delta insertion offset: ' +
+                (lastTextEditingDelta as TextEditingDeltaInsertion)
+                    .insertionOffset
+                    .toString(),
+            style: textStyle,
+          ),
+        if (lastTextEditingDelta is TextEditingDeltaDeletion)
+          Text(
+            'Delta deleted text: ' +
+                (lastTextEditingDelta as TextEditingDeltaDeletion)
+                    .textDeleted,
+            style: textStyle,
+          ),
+        if (lastTextEditingDelta is TextEditingDeltaDeletion)
+          Text(
+            'Delta beginning of deleted range: ' +
+                (lastTextEditingDelta as TextEditingDeltaDeletion)
+                    .deletedRange
+                    .start
+                    .toString(),
+            style: textStyle,
+          ),
+        if (lastTextEditingDelta is TextEditingDeltaDeletion)
+          Text(
+            'Delta end of deleted range: ' +
+                (lastTextEditingDelta as TextEditingDeltaDeletion)
+                    .deletedRange
+                    .end
+                    .toString(),
+            style: textStyle,
+          ),
+        if (lastTextEditingDelta is TextEditingDeltaReplacement)
+          Text(
+            'Delta text being replaced: ' +
+                (lastTextEditingDelta as TextEditingDeltaReplacement)
+                    .textReplaced,
+            style: textStyle,
+          ),
+        if (lastTextEditingDelta is TextEditingDeltaReplacement)
+          Text(
+              'Delta replacement source text: ' +
+                  (lastTextEditingDelta as TextEditingDeltaReplacement)
+                      .replacementText,
+              style: textStyle),
+        if (lastTextEditingDelta is TextEditingDeltaReplacement)
+          Text(
+            'Delta beginning of replaced range: ' +
+                (lastTextEditingDelta as TextEditingDeltaReplacement)
+                    .replacedRange
+                    .start
+                    .toString(),
+            style: textStyle,
+          ),
+        if (lastTextEditingDelta is TextEditingDeltaReplacement)
+          Text(
+            'Delta end of replaced range: ' +
+                (lastTextEditingDelta as TextEditingDeltaReplacement)
+                    .replacedRange
+                    .end
+                    .toString(),
+            style: textStyle,
+          ),
+        Text(
+          'Delta beginning of new selection: ' +
+              lastTextEditingDelta.selection.start.toString(),
+          style: textStyle,
+        ),
+        Text(
+          'Delta end of new selection: ' +
+              lastTextEditingDelta.selection.end.toString(),
+          style: textStyle,
+        ),
+        Text(
+          'Delta beginning of new composing: ' +
+              lastTextEditingDelta.composing.start.toString(),
+          style: textStyle,
+        ),
+        Text(
+          'Delta end of new composing: ' +
+              lastTextEditingDelta.composing.start.toString(),
+          style: textStyle,
+        ),
+      ],
+    );
   }
 }
