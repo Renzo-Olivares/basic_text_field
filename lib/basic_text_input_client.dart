@@ -43,7 +43,7 @@ class BasicTextInputClient extends StatefulWidget {
 }
 
 class _BasicTextInputClientState extends State<BasicTextInputClient>
-    implements TextInputClient {
+    implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
   TextEditingValue get _value => widget.controller.value;
   set _value(TextEditingValue value) {
