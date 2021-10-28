@@ -772,7 +772,7 @@ class ReplacementTextEditingController extends TextEditingController {
           print('syncing insertion');
           print(delta.textInserted);
           if (delta.insertionOffset > replacement.range.start &&
-              delta.insertionOffset < replacement.range.end) {
+              delta.insertionOffset <= replacement.range.end) {
             // Update range that falls inclusively inside the diff range.
             print('updating inclusive range on insertion');
             updatedReplacements.add(
@@ -783,8 +783,7 @@ class ReplacementTextEditingController extends TextEditingController {
                 ),
               ),
             );
-          } else if (delta.insertionOffset > replacement.range.end &&
-              delta.insertionOffset > replacement.range.end) {
+          } else if (delta.insertionOffset > replacement.range.end) {
             print('updating replacements that happened before insertion');
             updatedReplacements.add(replacement);
           } else if (delta.insertionOffset < replacement.range.start) {
