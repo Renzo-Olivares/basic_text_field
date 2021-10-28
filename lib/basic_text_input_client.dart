@@ -141,6 +141,29 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
 
   // End TextEditingActionTarget.
 
+  // The caret color is based on the underlying text's color. This is what
+  // Google Docs does.
+  Color get _caretColor {
+    const Color defaultColor = Colors.blue;
+    if (!_selection.isCollapsed || widget.controller.replacements == null) {
+      return defaultColor;
+    }
+
+    final int caretPosition = _selection.baseOffset;
+
+    // TODO(justinmc): What about multiple stacking or conflicting replacements?
+    for (TextEditingInlineSpanReplacement replacement in widget.controller.replacements!) {
+      if (caretPosition > replacement.range.start && caretPosition <= replacement.range.end) {
+        final InlineSpan span = replacement.generator(
+          replacement.range.textInside(widget.controller.text),
+          replacement.range,
+        );
+        return span.style?.color ?? defaultColor;
+      }
+    }
+    return defaultColor;
+  }
+
   @override
   Widget build(BuildContext context) {
     _focusAttachment!.reparent();
@@ -176,7 +199,7 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
                   ),
                   CustomPaint(
                     painter: _CustomTextOverlayPainter(
-                      color: Colors.blueAccent,
+                      color: _caretColor,
                       rects: <Rect>[_caretRect],
                     ),
                   ),
