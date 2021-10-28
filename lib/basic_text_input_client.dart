@@ -1,5 +1,3 @@
-import 'package:flutter/cupertino.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -43,7 +41,7 @@ class BasicTextInputClient extends StatefulWidget {
 }
 
 class _BasicTextInputClientState extends State<BasicTextInputClient>
-    implements DeltaTextInputClient {
+    with TextEditingActionTarget implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
   TextEditingValue get _value => widget.controller.value;
   set _value(TextEditingValue value) {
@@ -107,6 +105,36 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
     });
   }
 
+  // Start TextEditingActionTarget.
+
+  @override
+  bool get obscureText => false;
+
+  @override
+  bool get readOnly => false;
+
+  @override
+  bool get selectionEnabled => true;
+
+  @override
+  TextEditingValue get textEditingValue => widget.controller.value;
+
+  @override
+  TextLayoutMetrics get textLayoutMetrics => _renderParagraph;
+
+  @override
+  void debugAssertLayoutUpToDate() => _renderParagraph.debugAssertLayoutUpToDate();
+
+  @override
+  void setTextEditingValue(TextEditingValue newValue, SelectionChangedCause cause) {
+    if (newValue == textEditingValue) {
+      return;
+    }
+    widget.controller.value = newValue;
+  }
+
+  // End TextEditingActionTarget.
+
   @override
   Widget build(BuildContext context) {
     _focusAttachment!.reparent();
@@ -117,46 +145,36 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
         const SizedBox(height: 10),
         DeltaDisplay(delta: lastTextEditingDelta),
         const SizedBox(height: 20),
-        Shortcuts(
-          shortcuts: <ShortcutActivator, Intent>{
-            SingleActivator(LogicalKeyboardKey.backspace): _MyDeleteTextIntent(),
-          },
-          child: Actions(
-            actions: <Type, Action<Intent>>{
-              DeleteTextIntent: _MyDeleteTextAction(),
-            },
-            child: Focus(
-              focusNode: widget.focusNode,
-              child: GestureDetector(
-                onTap: _requestKeyboard,
-                onTapUp: _tapUp,
-                child: Container(
-                  width: 350,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.blueAccent),
-                    borderRadius: BorderRadius.circular(4),
+        FocusTrapArea(
+          focusNode: widget.focusNode,
+          child: GestureDetector(
+            onTap: _requestKeyboard,
+            onTapUp: _tapUp,
+            child: Container(
+              width: 350,
+              height: 150,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.blueAccent),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Stack(
+                children: [
+                  Text.rich(
+                    widget.controller
+                        .buildTextSpan(context: context, withComposing: true),
+                    key: _textKey,
+                    style: widget.style,
+                    textDirection: widget.textDirection,
+                    textAlign: widget.textAlign,
+                    maxLines: widget.maxLines,
                   ),
-                  child: Stack(
-                    children: [
-                      Text.rich(
-                        widget.controller
-                            .buildTextSpan(context: context, withComposing: true),
-                        key: _textKey,
-                        style: widget.style,
-                        textDirection: widget.textDirection,
-                        textAlign: widget.textAlign,
-                        maxLines: widget.maxLines,
-                      ),
-                      CustomPaint(
-                        painter: _CustomTextOverlayPainter(
-                          color: Colors.blueAccent,
-                          rects: <Rect>[_caretRect],
-                        ),
-                      ),
-                    ],
+                  CustomPaint(
+                    painter: _CustomTextOverlayPainter(
+                      color: Colors.blueAccent,
+                      rects: <Rect>[_caretRect],
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -764,7 +782,6 @@ class ReplacementTextEditingController extends TextEditingController {
               delta.insertionOffset > replacement.range.end) {
             print('updating replacements that happened before insertion');
             updatedReplacements.add(replacement);
-            // print(replacement);
           } else if (delta.insertionOffset < replacement.range.start) {
             // Update ranges that falls after the diff range.
             print('updating replacements that happened after insertion');
@@ -921,7 +938,6 @@ class ReplacementTextEditingController extends TextEditingController {
     if (!composingRegionReplaceable &&
         value.isComposingRangeValid &&
         withComposing) {
-      print('heh');
       _addToMappingWithOverlaps((String value, TextRange range) {
         final TextStyle composingStyle = style != null
             ? style.merge(const TextStyle(decoration: TextDecoration.underline))
@@ -932,7 +948,6 @@ class ReplacementTextEditingController extends TextEditingController {
         );
       }, value.composing, rangeSpanMapping, value.text);
     }
-    print('whot');
     // Iterate through TextEditingInlineSpanReplacements, handling overlapping
     // replacements and mapping them towards a generated InlineSpan.
     if (replacements != null) {
@@ -949,7 +964,6 @@ class ReplacementTextEditingController extends TextEditingController {
     } else {
       print('replacements is null');
     }
-    print('lmao');
     // If the composing range is out of range for the current text, ignore it to
     // preserve the tree integrity, otherwise in release mode a RangeError will
     // be thrown and this EditableText will be built with a broken subtree.
@@ -958,7 +972,6 @@ class ReplacementTextEditingController extends TextEditingController {
     if (composingRegionReplaceable &&
         value.isComposingRangeValid &&
         withComposing) {
-      print('guess we in here');
       _addToMappingWithOverlaps((String value, TextRange range) {
         final TextStyle composingStyle = style != null
             ? style.merge(const TextStyle(decoration: TextDecoration.underline))
@@ -969,7 +982,6 @@ class ReplacementTextEditingController extends TextEditingController {
         );
       }, value.composing, rangeSpanMapping, value.text);
     }
-    print('uhhhh');
     // Sort the matches by start index. Since no overlapping exists, this is safe.
     final List<TextRange> sortedRanges = rangeSpanMapping.keys.toList();
     sortedRanges.sort((TextRange a, TextRange b) => a.start.compareTo(b.start));
@@ -1046,17 +1058,5 @@ class ReplacementTextEditingController extends TextEditingController {
       rangeSpanMapping[matchedRange] =
           generator(matchedRange.textInside(text), matchedRange);
     }
-  }
-}
-
-class _MyDeleteTextIntent extends Intent {
-  const _MyDeleteTextIntent();
-}
-
-class _MyDeleteTextAction extends ContextAction<DeleteTextIntent> {
-  @override
-  Object? invoke(DeleteTextIntent intent, [BuildContext? context]) {
-    print('justin delete!');
-    //textEditingActionTarget!.delete(SelectionChangedCause.keyboard);
   }
 }
