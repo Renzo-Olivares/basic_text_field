@@ -111,45 +111,60 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
   Widget build(BuildContext context) {
     _focusAttachment!.reparent();
 
-    return Column(
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0),
       children: <Widget>[
         const SizedBox(height: 10),
         DeltaDisplay(delta: lastTextEditingDelta),
         const SizedBox(height: 20),
-        FocusTrapArea(
-          focusNode: widget.focusNode,
-          child: GestureDetector(
-            onTap: _requestKeyboard,
-            onTapUp: _tapUp,
-            child: Container(
-              width: 350,
-              height: 150,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.blueAccent),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Stack(
-                children: [
-                  Text.rich(
-                    widget.controller
-                        .buildTextSpan(context: context, withComposing: true),
-                    key: _textKey,
-                    style: widget.style,
-                    textDirection: widget.textDirection,
-                    textAlign: widget.textAlign,
-                    maxLines: widget.maxLines,
+        Shortcuts(
+          shortcuts: <ShortcutActivator, Intent>{
+            SingleActivator(LogicalKeyboardKey.backspace): _MyDeleteTextIntent(),
+          },
+          child: Actions(
+            actions: <Type, Action<Intent>>{
+              DeleteTextIntent: _MyDeleteTextAction(),
+            },
+            child: Focus(
+              focusNode: widget.focusNode,
+              child: GestureDetector(
+                onTap: _requestKeyboard,
+                onTapUp: _tapUp,
+                child: Container(
+                  width: 350,
+                  height: 150,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.blueAccent),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                  CustomPaint(
-                    painter: _CustomTextOverlayPainter(
-                      color: Colors.blueAccent,
-                      rects: <Rect>[_caretRect],
-                    ),
+                  child: Stack(
+                    children: [
+                      Text.rich(
+                        widget.controller
+                            .buildTextSpan(context: context, withComposing: true),
+                        key: _textKey,
+                        style: widget.style,
+                        textDirection: widget.textDirection,
+                        textAlign: widget.textAlign,
+                        maxLines: widget.maxLines,
+                      ),
+                      CustomPaint(
+                        painter: _CustomTextOverlayPainter(
+                          color: Colors.blueAccent,
+                          rects: <Rect>[_caretRect],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
         ),
+        /*
+        const SizedBox(height: 20),
+        TextField(),
+        */
       ],
     );
   }
@@ -212,6 +227,7 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
     if (!_hasInputConnection) return;
     final TextEditingValue localValue = _value;
     if (localValue == _lastKnownRemoteTextEditingValue) return;
+    print('justin setEditingState $localValue');
     _textInputConnection!.setEditingState(localValue);
     _lastKnownRemoteTextEditingValue = localValue;
   }
@@ -387,6 +403,7 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
 
   @override
   void updateEditingValueWithDeltas(List<TextEditingDelta> textEditingDeltas) {
+    print('justin in app with deltas');
     TextEditingValue value = _value;
 
     for (final TextEditingDelta delta in textEditingDeltas) {
@@ -1029,5 +1046,17 @@ class ReplacementTextEditingController extends TextEditingController {
       rangeSpanMapping[matchedRange] =
           generator(matchedRange.textInside(text), matchedRange);
     }
+  }
+}
+
+class _MyDeleteTextIntent extends Intent {
+  const _MyDeleteTextIntent();
+}
+
+class _MyDeleteTextAction extends ContextAction<DeleteTextIntent> {
+  @override
+  Object? invoke(DeleteTextIntent intent, [BuildContext? context]) {
+    print('justin delete!');
+    //textEditingActionTarget!.delete(SelectionChangedCause.keyboard);
   }
 }
