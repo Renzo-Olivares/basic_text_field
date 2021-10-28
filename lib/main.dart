@@ -33,6 +33,93 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _controller = TextEditingController();
+  final ReplacementTextEditingController _replacementTextEditingController =
+      ReplacementTextEditingController(
+    text: 'The quick brown fox jumps over the lazy dog.',
+    replacements: <TextEditingInlineSpanReplacement>[
+      TextEditingInlineSpanReplacement(
+        const TextRange(start: 0, end: 3),
+        (String value, TextRange range) {
+          return TextSpan(
+            text: value,
+            style: const TextStyle(color: Colors.blue),
+          );
+        },
+      ),
+      TextEditingInlineSpanReplacement(
+        const TextRange(start: 4, end: 9),
+        (String value, TextRange range) {
+          return TextSpan(
+            text: value,
+            style: const TextStyle(color: Colors.red),
+          );
+        },
+      ),
+      TextEditingInlineSpanReplacement(
+        const TextRange(start: 10, end: 15),
+        (String value, TextRange range) {
+          return TextSpan(
+            text: value,
+            style: const TextStyle(color: Colors.green),
+          );
+        },
+      ),
+      TextEditingInlineSpanReplacement(
+        const TextRange(start: 16, end: 19),
+        (String value, TextRange range) {
+          return TextSpan(
+            text: value,
+            style: const TextStyle(color: Colors.yellow),
+          );
+        },
+      ),
+      TextEditingInlineSpanReplacement(
+        const TextRange(start: 20, end: 25),
+        (String value, TextRange range) {
+          return TextSpan(
+            text: value,
+            style: const TextStyle(color: Colors.pink),
+          );
+        },
+      ),
+      TextEditingInlineSpanReplacement(
+        TextRange(start: 26, end: 30),
+        (String value, TextRange range) {
+          return TextSpan(
+            text: value,
+            style: TextStyle(color: Colors.indigo),
+          );
+        },
+      ),
+      TextEditingInlineSpanReplacement(
+        const TextRange(start: 31, end: 34),
+        (String value, TextRange range) {
+          return TextSpan(
+            text: value,
+            style: const TextStyle(color: Colors.purple),
+          );
+        },
+      ),
+      TextEditingInlineSpanReplacement(
+        const TextRange(start: 35, end: 39),
+        (String value, TextRange range) {
+          return TextSpan(
+            text: value,
+            style: const TextStyle(color: Colors.teal),
+          );
+        },
+      ),
+      TextEditingInlineSpanReplacement(
+        const TextRange(start: 40, end: 43),
+        (String value, TextRange range) {
+          return TextSpan(
+            text: value,
+            style: const TextStyle(color: Colors.lime),
+          );
+        },
+      ),
+    ],
+  );
 
   void _updateTextOverlay() {
     setState(() {});
@@ -46,7 +133,7 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Center(
         child: BasicTextInputClient(
-          controller: _controller,
+          controller: _replacementTextEditingController,
           maxLines: null,
           textAlign: TextAlign.left,
           focusNode: _focusNode,
