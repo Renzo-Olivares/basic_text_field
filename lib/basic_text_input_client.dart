@@ -40,6 +40,12 @@ class BasicTextInputClient extends StatefulWidget {
   _BasicTextInputClientState createState() => _BasicTextInputClientState();
 }
 
+// TODO(justinmc): This implements TextEditingActionTarget, which means that
+// keyboard shortcuts and non-text keys (like backspace, arrows, etc.) will be
+// handled by the framework. However, these things currently don't generate
+// deltas, so the replacements will get out of sync. We should generate deltas
+// by making everything go through the common replace method in
+// TextEditingActionTarget.
 class _BasicTextInputClientState extends State<BasicTextInputClient>
     with TextEditingActionTarget implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
@@ -151,8 +157,8 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
             onTap: _requestKeyboard,
             onTapUp: _tapUp,
             child: Container(
-              width: 350,
-              height: 150,
+              width: 350.0,
+              height: 250.0,
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.blueAccent),
                 borderRadius: BorderRadius.circular(4),
@@ -421,7 +427,6 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
 
   @override
   void updateEditingValueWithDeltas(List<TextEditingDelta> textEditingDeltas) {
-    print('justin in app with deltas');
     TextEditingValue value = _value;
 
     for (final TextEditingDelta delta in textEditingDeltas) {

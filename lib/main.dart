@@ -35,7 +35,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _controller = TextEditingController();
   final ReplacementTextEditingController _replacementTextEditingController =
       ReplacementTextEditingController(
-    text: 'The quick brown fox jumps over the lazy dog.',
+    text: 'The quick brown fox jumps over the lazy * dog.',
     replacements: <TextEditingInlineSpanReplacement>[
       TextEditingInlineSpanReplacement(
         const TextRange(start: 0, end: 3),
@@ -51,7 +51,10 @@ class _MyHomePageState extends State<MyHomePage> {
         (String value, TextRange range) {
           return TextSpan(
             text: value,
-            style: const TextStyle(color: Colors.red),
+            style: const TextStyle(
+              color: Colors.red,
+              fontWeight: FontWeight.bold,
+            ),
           );
         },
       ),
@@ -69,7 +72,9 @@ class _MyHomePageState extends State<MyHomePage> {
         (String value, TextRange range) {
           return TextSpan(
             text: value,
-            style: const TextStyle(color: Colors.yellow),
+            style: const TextStyle(
+              color: Colors.yellow,
+            ),
           );
         },
       ),
@@ -78,16 +83,19 @@ class _MyHomePageState extends State<MyHomePage> {
         (String value, TextRange range) {
           return TextSpan(
             text: value,
-            style: const TextStyle(color: Colors.pink),
+            style: const TextStyle(
+              color: Colors.pink,
+              fontSize: 60.0,
+            ),
           );
         },
       ),
       TextEditingInlineSpanReplacement(
-        TextRange(start: 26, end: 30),
+        const TextRange(start: 26, end: 30),
         (String value, TextRange range) {
           return TextSpan(
             text: value,
-            style: TextStyle(color: Colors.indigo),
+            style: const TextStyle(color: Colors.indigo),
           );
         },
       ),
@@ -96,7 +104,10 @@ class _MyHomePageState extends State<MyHomePage> {
         (String value, TextRange range) {
           return TextSpan(
             text: value,
-            style: const TextStyle(color: Colors.purple),
+            style: const TextStyle(
+              color: Colors.purple,
+              decoration: TextDecoration.underline,
+            ),
           );
         },
       ),
@@ -110,7 +121,15 @@ class _MyHomePageState extends State<MyHomePage> {
         },
       ),
       TextEditingInlineSpanReplacement(
-        const TextRange(start: 40, end: 43),
+        const TextRange(start: 40, end: 41),
+        (String value, TextRange range) {
+          return WidgetSpan(
+            child: Image.asset('assets/flutter_f.png'),
+          );
+        },
+      ),
+      TextEditingInlineSpanReplacement(
+        const TextRange(start: 42, end: 45),
         (String value, TextRange range) {
           return TextSpan(
             text: value,
@@ -138,7 +157,9 @@ class _MyHomePageState extends State<MyHomePage> {
           textAlign: TextAlign.left,
           focusNode: _focusNode,
           updateTextOverlay: _updateTextOverlay,
-          style: const TextStyle(),
+          style: const TextStyle(
+            fontSize: 26.0,
+          ),
         ),
       ),
     );
