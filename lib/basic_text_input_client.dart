@@ -141,12 +141,18 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
 
   // End TextEditingActionTarget.
 
+  static const Color _defaultCaretColor = Colors.blue;
+  Color? _cachedCaretColor;
   // The caret color is based on the underlying text's color. This is what
   // Google Docs does.
   Color get _caretColor {
-    const Color defaultColor = Colors.blue;
+    if (_cachedCaretColor != null) {
+      return _cachedCaretColor!;
+    }
+
     if (!_selection.isCollapsed || widget.controller.replacements == null) {
-      return defaultColor;
+      _cachedCaretColor = _defaultCaretColor;
+      return _cachedCaretColor!;
     }
 
     final int caretPosition = _selection.baseOffset;
@@ -158,10 +164,12 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
           replacement.range.textInside(widget.controller.text),
           replacement.range,
         );
-        return span.style?.color ?? defaultColor;
+        _cachedCaretColor = span.style?.color ?? _defaultCaretColor;
+        return _cachedCaretColor!;
       }
     }
-    return defaultColor;
+    _cachedCaretColor = _defaultCaretColor;
+    return _cachedCaretColor!;
   }
 
   @override
@@ -238,6 +246,8 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
     if (_selection.extentOffset < 0) {
       return;
     }
+
+    _cachedCaretColor = null;
 
     final Offset caretOffset =
         _renderParagraph.getOffsetForCaret(_selection.extent, Rect.zero);
