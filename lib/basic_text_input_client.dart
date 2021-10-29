@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -249,10 +251,18 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
 
     _cachedCaretColor = null;
 
-    final Offset caretOffset =
-        _renderParagraph.getOffsetForCaret(_selection.extent, Rect.zero);
-    final double? caretHeight =
-        _renderParagraph.getFullHeightForCaret(_selection.extent);
+    final TextPosition previousPosition = TextPosition(
+      offset: math.max(0, _selection.extentOffset - 1),
+      affinity: TextAffinity.downstream,
+    );
+
+    // The caret should style itself based on the previous position, because any
+    // text inserted will inherit the style of the previous position.
+    final Offset caretOffset = Offset(
+      _renderParagraph.getOffsetForCaret(_selection.extent, Rect.zero).dx,
+      _renderParagraph.getOffsetForCaret(previousPosition, Rect.zero).dy,
+    );
+    final double? caretHeight = _renderParagraph.getFullHeightForCaret(previousPosition);
 
     if (caretOffset.dx == 0 && caretOffset.dy == 0) {
       _caretRect = Rect.zero;
