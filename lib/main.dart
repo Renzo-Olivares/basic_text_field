@@ -35,7 +35,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _controller = TextEditingController();
   final ReplacementTextEditingController _replacementTextEditingController =
       ReplacementTextEditingController(
-    text: 'The quick brown fox jumps over the lazy * dog.',
+    text: 'The quick brown fox jumps over the lazy \uffff dog.',
     replacements: <TextEditingInlineSpanReplacement>[
       TextEditingInlineSpanReplacement(
         const TextRange(start: 0, end: 3),

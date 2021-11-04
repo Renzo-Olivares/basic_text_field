@@ -131,14 +131,34 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
   TextLayoutMetrics get textLayoutMetrics => _renderParagraph;
 
   @override
-  void debugAssertLayoutUpToDate() => _renderParagraph.debugAssertLayoutUpToDate();
-
-  @override
   void setTextEditingValue(TextEditingValue newValue, SelectionChangedCause cause) {
     if (newValue == textEditingValue) {
       return;
     }
-    widget.controller.value = newValue;
+    // TODO(justinmc): How should we handle framework changes to the
+    // TextEditingValue? One way would be to effectively do a diff here.
+    // This detection of delete is totally hacked though.
+    if (newValue.text.length == textEditingValue.text.length - 1) {
+      late final int deletedIndex;
+      for (int i = 0; i < newValue.text.length; i++) {
+        if (textEditingValue.text[i] != newValue.text[i]) {
+          deletedIndex = i;
+          break;
+        } else if (i == newValue.text.length - 1) {
+          deletedIndex = newValue.text.length;
+          break;
+        }
+      }
+      updateEditingValueWithDeltas(<TextEditingDelta>[TextEditingDeltaDeletion(
+        oldText: textEditingValue.text,
+        selection: newValue.selection,
+        composing: newValue.composing,
+        deletedRange: TextRange(start: deletedIndex, end: deletedIndex + 1),
+      )]);
+      assert(textEditingValue == newValue);
+    } else {
+      widget.controller.value = newValue;
+    }
   }
 
   // End TextEditingActionTarget.
@@ -294,7 +314,6 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
     if (!_hasInputConnection) return;
     final TextEditingValue localValue = _value;
     if (localValue == _lastKnownRemoteTextEditingValue) return;
-    print('justin setEditingState $localValue');
     _textInputConnection!.setEditingState(localValue);
     _lastKnownRemoteTextEditingValue = localValue;
   }
