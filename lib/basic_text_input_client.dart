@@ -42,8 +42,6 @@ class BasicTextInputClient extends StatefulWidget {
   _BasicTextInputClientState createState() => _BasicTextInputClientState();
 }
 
-// TODO(justinmc): This won't receive updates from shortcuts handled by the
-// framework. We need a way to generate deltas for those kinds of changes.
 class _BasicTextInputClientState extends State<BasicTextInputClient>
     implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
@@ -140,6 +138,42 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
     return _cachedCaretColor!;
   }
 
+  // TODO(justinmc): Handling of the default text editing shortcuts with deltas
+  // needs to be in the framework somehow.  This should go through some kind of
+  // generic "replace" method like in EditableText.
+  void _delete() {
+    if (_value.text.isEmpty) {
+      return;
+    }
+
+    late final TextRange deletedRange;
+    if (_selection.isCollapsed) {
+      if (_selection.baseOffset == 0) {
+        return;
+      }
+      final int deletedLength = _value.text.substring(0, _selection.baseOffset).characters.last.length;
+      deletedRange = TextRange(
+        start: _selection.baseOffset - deletedLength,
+        end: _selection.baseOffset,
+      );
+    } else {
+      deletedRange = _selection;
+    }
+
+    updateEditingValueWithDeltas(<TextEditingDelta>[TextEditingDeltaDeletion(
+      oldText: _value.text,
+      selection: TextSelection.collapsed(offset: deletedRange.start),
+      composing: TextRange.collapsed(deletedRange.start),
+      deletedRange: deletedRange,
+    )]);
+  }
+
+  late final Map<Type, Action<Intent>> _actions = <Type, Action<Intent>>{
+    DeleteCharacterIntent: CallbackAction<DeleteCharacterIntent>(
+      onInvoke: (DeleteCharacterIntent intent) => _delete(),
+    ),
+  };
+
   @override
   Widget build(BuildContext context) {
     _focusAttachment!.reparent();
@@ -150,36 +184,39 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
         const SizedBox(height: 10),
         DeltaDisplay(delta: lastTextEditingDelta),
         const SizedBox(height: 20),
-        FocusTrapArea(
-          focusNode: widget.focusNode,
-          child: GestureDetector(
-            onTap: _requestKeyboard,
-            onTapUp: _tapUp,
-            child: Container(
-              width: 350.0,
-              height: 250.0,
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.blueAccent),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Stack(
-                children: [
-                  Text.rich(
-                    widget.controller
-                        .buildTextSpan(context: context, withComposing: true),
-                    key: _textKey,
-                    style: widget.style,
-                    textDirection: widget.textDirection,
-                    textAlign: widget.textAlign,
-                    maxLines: widget.maxLines,
-                  ),
-                  CustomPaint(
-                    painter: _CustomTextOverlayPainter(
-                      color: _caretColor,
-                      rects: <Rect>[_caretRect],
+        Actions(
+          actions: _actions,
+          child: Focus(
+            focusNode: widget.focusNode,
+            child: GestureDetector(
+              onTap: _requestKeyboard,
+              onTapUp: _tapUp,
+              child: Container(
+                width: 350.0,
+                height: 250.0,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.blueAccent),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Stack(
+                  children: [
+                    Text.rich(
+                      widget.controller
+                          .buildTextSpan(context: context, withComposing: true),
+                      key: _textKey,
+                      style: widget.style,
+                      textDirection: widget.textDirection,
+                      textAlign: widget.textAlign,
+                      maxLines: widget.maxLines,
                     ),
-                  ),
-                ],
+                    CustomPaint(
+                      painter: _CustomTextOverlayPainter(
+                        color: _caretColor,
+                        rects: <Rect>[_caretRect],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
