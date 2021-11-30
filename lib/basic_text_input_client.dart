@@ -42,14 +42,10 @@ class BasicTextInputClient extends StatefulWidget {
   _BasicTextInputClientState createState() => _BasicTextInputClientState();
 }
 
-// TODO(justinmc): This implements TextEditingActionTarget, which means that
-// keyboard shortcuts and non-text keys (like backspace, arrows, etc.) will be
-// handled by the framework. However, these things currently don't generate
-// deltas, so the replacements will get out of sync. We should generate deltas
-// by making everything go through the common replace method in
-// TextEditingActionTarget.
+// TODO(justinmc): This won't receive updates from shortcuts handled by the
+// framework. We need a way to generate deltas for those kinds of changes.
 class _BasicTextInputClientState extends State<BasicTextInputClient>
-    with TextEditingActionTarget implements DeltaTextInputClient {
+    implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
   TextEditingValue get _value => widget.controller.value;
   set _value(TextEditingValue value) {
@@ -112,56 +108,6 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
       });
     });
   }
-
-  // Start TextEditingActionTarget.
-
-  @override
-  bool get obscureText => false;
-
-  @override
-  bool get readOnly => false;
-
-  @override
-  bool get selectionEnabled => true;
-
-  @override
-  TextEditingValue get textEditingValue => widget.controller.value;
-
-  @override
-  TextLayoutMetrics get textLayoutMetrics => _renderParagraph;
-
-  @override
-  void setTextEditingValue(TextEditingValue newValue, SelectionChangedCause cause) {
-    if (newValue == textEditingValue) {
-      return;
-    }
-    // TODO(justinmc): How should we handle framework changes to the
-    // TextEditingValue? One way would be to effectively do a diff here.
-    // This detection of delete is totally hacked though.
-    if (newValue.text.length == textEditingValue.text.length - 1) {
-      late final int deletedIndex;
-      for (int i = 0; i < newValue.text.length; i++) {
-        if (textEditingValue.text[i] != newValue.text[i]) {
-          deletedIndex = i;
-          break;
-        } else if (i == newValue.text.length - 1) {
-          deletedIndex = newValue.text.length;
-          break;
-        }
-      }
-      updateEditingValueWithDeltas(<TextEditingDelta>[TextEditingDeltaDeletion(
-        oldText: textEditingValue.text,
-        selection: newValue.selection,
-        composing: newValue.composing,
-        deletedRange: TextRange(start: deletedIndex, end: deletedIndex + 1),
-      )]);
-      assert(textEditingValue == newValue);
-    } else {
-      widget.controller.value = newValue;
-    }
-  }
-
-  // End TextEditingActionTarget.
 
   static const Color _defaultCaretColor = Colors.blue;
   Color? _cachedCaretColor;
