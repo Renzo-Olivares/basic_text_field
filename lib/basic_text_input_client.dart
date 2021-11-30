@@ -141,6 +141,9 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
   // TODO(justinmc): Handling of the default text editing shortcuts with deltas
   // needs to be in the framework somehow.  This should go through some kind of
   // generic "replace" method like in EditableText.
+  // EditableText converts intents like DeleteCharacterIntent to a generic
+  // ReplaceTextIntent. I wonder if that could be done at a higher level, so
+  // that users could listen to that instead of DeleteCharacterIntent?
   void _delete() {
     if (_value.text.isEmpty) {
       return;
@@ -168,9 +171,40 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
     )]);
   }
 
+  void _extendSelection(bool forward) {
+    late final TextSelection selection;
+    if (!_selection.isCollapsed) {
+      final int firstOffset = _selection.isNormalized ? _selection.start : _selection.end;
+      final int lastOffset = _selection.isNormalized ? _selection.end : _selection.start;
+      selection = TextSelection.collapsed(offset: forward ? lastOffset : firstOffset);
+    } else {
+      if (forward && _selection.baseOffset == _value.text.length) {
+        return;
+      }
+      if (!forward && _selection.baseOffset == 0) {
+        return;
+      }
+      final int adjustment = forward
+          ? _value.text.substring(_selection.baseOffset).characters.first.length
+          : -_value.text.substring(0, _selection.baseOffset).characters.last.length;
+      selection = TextSelection.collapsed(
+        offset: _selection.baseOffset + adjustment,
+      );
+    }
+
+    updateEditingValueWithDeltas(<TextEditingDelta>[TextEditingDeltaNonTextUpdate(
+      oldText: _value.text,
+      selection: selection,
+      composing: _value.composing,
+    )]);
+  }
+
   late final Map<Type, Action<Intent>> _actions = <Type, Action<Intent>>{
     DeleteCharacterIntent: CallbackAction<DeleteCharacterIntent>(
       onInvoke: (DeleteCharacterIntent intent) => _delete(),
+    ),
+    ExtendSelectionByCharacterIntent: CallbackAction<ExtendSelectionByCharacterIntent>(
+      onInvoke: (ExtendSelectionByCharacterIntent intent) => _extendSelection(intent.forward),
     ),
   };
 
