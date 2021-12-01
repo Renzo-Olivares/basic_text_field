@@ -163,12 +163,12 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
       deletedRange = _selection;
     }
 
-    updateEditingValueWithDeltas(<TextEditingDelta>[TextEditingDeltaDeletion(
+    _setEditingValueWithDelta(TextEditingDeltaDeletion(
       oldText: _value.text,
       selection: TextSelection.collapsed(offset: deletedRange.start),
       composing: TextRange.collapsed(deletedRange.start),
       deletedRange: deletedRange,
-    )]);
+    ));
   }
 
   void _extendSelection(bool forward) {
@@ -192,11 +192,11 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
       );
     }
 
-    updateEditingValueWithDeltas(<TextEditingDelta>[TextEditingDeltaNonTextUpdate(
+    _setEditingValueWithDelta(TextEditingDeltaNonTextUpdate(
       oldText: _value.text,
       selection: selection,
       composing: _value.composing,
-    )]);
+    ));
   }
 
   late final Map<Type, Action<Intent>> _actions = <Type, Action<Intent>>{
@@ -487,6 +487,20 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
           break;
       }
     }
+  }
+
+  void _setEditingValueWithDelta(TextEditingDelta textEditingDelta) {
+    TextEditingValue value = _value;
+
+    lastTextEditingDelta = textEditingDelta;
+    value = textEditingDelta.apply(value);
+
+    if (value == _value) {
+      return;
+    }
+
+    _value = value;
+    widget.controller.syncReplacementRanges(textEditingDelta);
   }
 
   @override
