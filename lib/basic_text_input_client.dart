@@ -539,7 +539,6 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
     _value = value;
 
     for (final TextEditingDelta delta in textEditingDeltas) {
-      print(delta.runtimeType.toString());
       widget.controller.syncReplacementRanges(delta);
     }
   }
