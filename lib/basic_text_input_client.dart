@@ -764,6 +764,11 @@ class TextEditingInlineSpanReplacement {
   TextEditingInlineSpanReplacement copy({required TextRange range}) {
     return TextEditingInlineSpanReplacement(range, this.generator);
   }
+
+  @override
+  String toString() {
+    return 'TextEditingInlineSpanReplacement { range: $range, generator: $generator }';
+  }
 }
 
 /// A [TextEditingController] that contains a list of [TextEditingInlineSpanReplacement]s that
@@ -850,38 +855,51 @@ class ReplacementTextEditingController extends TextEditingController {
   ///
   /// TODO: Behavior when deletion is at edges of a replacements range.
   void syncReplacementRanges(TextEditingDelta delta) {
-    if (replacements != null) {
-      print('syncing ranges');
-      print(replacements!.length.toString());
-      if (text.isEmpty) {
-        replacements!.clear();
-      }
-      List<TextEditingInlineSpanReplacement> updatedReplacements = [];
+    if (replacements == null) {
+      return;
+    }
+    //print('syncing ranges for delta $delta');
+    //print(replacements!.length.toString());
+    if (text.isEmpty) {
+      replacements!.clear();
+    }
+    List<TextEditingInlineSpanReplacement> updatedReplacements = [];
 
-      for (final TextEditingInlineSpanReplacement replacement
-          in replacements!) {
-        if (delta is TextEditingDeltaInsertion) {
-          print('syncing insertion');
-          print(delta.textInserted);
-          if (delta.insertionOffset > replacement.range.start &&
-              delta.insertionOffset <= replacement.range.end) {
-            // Update range that falls inclusively inside the diff range.
-            print('updating inclusive range on insertion');
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start,
-                  end: replacement.range.end + 1,
-                ),
+    for (final TextEditingInlineSpanReplacement replacement
+        in replacements!) {
+      if (delta is TextEditingDeltaInsertion) {
+        //print('syncing insertion');
+        //print(delta.textInserted);
+        if (delta.insertionOffset > replacement.range.start &&
+            delta.insertionOffset <= replacement.range.end) {
+          // Update range that falls inclusively inside the diff range.
+          //print('updating inclusive range on insertion');
+          updatedReplacements.add(
+            replacement.copy(
+              range: TextRange(
+                start: replacement.range.start,
+                end: replacement.range.end + 1,
               ),
-            );
-          } else if (delta.insertionOffset > replacement.range.end) {
-            print('updating replacements that happened before insertion');
-            updatedReplacements.add(replacement);
-          } else if (delta.insertionOffset < replacement.range.start) {
-            // Update ranges that falls after the diff range.
-            print('updating replacements that happened after insertion');
-            print('not sure about this case');
+            ),
+          );
+        } else if (delta.insertionOffset > replacement.range.end) {
+          //print('updating replacements that happened before insertion');
+          updatedReplacements.add(replacement);
+        } else if (delta.insertionOffset < replacement.range.start) {
+          // Update ranges that falls after the diff range.
+          //print('updating replacements that happened after insertion');
+          //print('not sure about this case');
+          updatedReplacements.add(
+            replacement.copy(
+              range: TextRange(
+                start: replacement.range.start + delta.textInserted.length,
+                end: replacement.range.end + delta.textInserted.length,
+              ),
+            ),
+          );
+        } else if (delta.insertionOffset == replacement.range.start || delta.insertionOffset == replacement.range.end) {
+          if (delta.insertionOffset == replacement.range.start) {
+            // Inserting at the beginning of a replacement.
             updatedReplacements.add(
               replacement.copy(
                 range: TextRange(
@@ -890,51 +908,61 @@ class ReplacementTextEditingController extends TextEditingController {
                 ),
               ),
             );
-          } else if (delta.insertionOffset == replacement.range.start || delta.insertionOffset == replacement.range.end) {
-            if (delta.insertionOffset == replacement.range.start) {
-              // Inserting at the beginning of a replacement.
-              updatedReplacements.add(
-                replacement.copy(
-                  range: TextRange(
-                    start: replacement.range.start + delta.textInserted.length,
-                    end: replacement.range.end + delta.textInserted.length,
-                  ),
-                ),
-              );
-            } else if (delta.insertionOffset == replacement.range.end) {
-              // Inserting at end of a replacement.
-              updatedReplacements.add(replacement);
-            }
-          }
-        } else if (delta is TextEditingDeltaDeletion) {
-          print('syncing deletion');
-          if (delta.deletedRange.start >= replacement.range.start &&
-              delta.deletedRange.end <= replacement.range.end) {
-            // Update replacement ranges directly inclusively associated with deleted range.
-            print('updating inclusive ranges of deletion');
-            if (replacement.range.start !=
-                replacement.range.end - delta.textDeleted.length) {
-              updatedReplacements.add(
-                replacement.copy(
-                  range: TextRange(
-                    start: replacement.range.start,
-                    end: replacement.range.end - delta.textDeleted.length,
-                  ),
-                ),
-              );
-            } else {
-              print('start = end on deletion so remove attribute');
-            }
-          } else if (delta.deletedRange.start > replacement.range.end &&
-              delta.deletedRange.end > replacement.range.end) {
-            // If range happened before deletion, skip updating it.
-            print(
-                'updating replacement ranges that happened before the deletion.');
+          } else if (delta.insertionOffset == replacement.range.end) {
+            // Inserting at end of a replacement.
             updatedReplacements.add(replacement);
-          } else if (delta.deletedRange.end < replacement.range.start) {
-            // If deletion happened before range of current attribute, update it.
-            print(
-                'updating replacement ranges that happened after the deletion.');
+          }
+        }
+      } else if (delta is TextEditingDeltaDeletion) {
+        //print('syncing deletion');
+        if (delta.deletedRange.start >= replacement.range.start &&
+            delta.deletedRange.end <= replacement.range.end) {
+          // Update replacement ranges directly inclusively associated with deleted range.
+          //print('updating inclusive ranges of deletion');
+          if (replacement.range.start !=
+              replacement.range.end - delta.textDeleted.length) {
+            updatedReplacements.add(
+              replacement.copy(
+                range: TextRange(
+                  start: replacement.range.start,
+                  end: replacement.range.end - delta.textDeleted.length,
+                ),
+              ),
+            );
+          } else {
+            //print('start = end on deletion so remove attribute');
+          }
+        } else if (delta.deletedRange.start > replacement.range.end &&
+            delta.deletedRange.end > replacement.range.end) {
+          // If range happened before deletion, skip updating it.
+          //print(
+              //'updating replacement ranges that happened before the deletion.');
+          updatedReplacements.add(replacement);
+        } else if (delta.deletedRange.end < replacement.range.start) {
+          // If deletion happened before range of current attribute, update it.
+          //print(
+              //'updating replacement ranges that happened after the deletion.');
+          updatedReplacements.add(
+            replacement.copy(
+              range: TextRange(
+                start: replacement.range.start - delta.textDeleted.length,
+                end: replacement.range.end - delta.textDeleted.length,
+              ),
+            ),
+          );
+        } else if (delta.deletedRange.start == replacement.range.start ||
+            delta.deletedRange.start == replacement.range.end ||
+            delta.deletedRange.end == replacement.range.start ||
+            delta.deletedRange.end == replacement.range.end) {
+          //print('updating ranges that are touching the deletion');
+
+          // If the replacement is a textspan, then merge the attributes and ranges into one.
+          // If they are of different type then, simply don't update them.
+          if (delta.deletedRange.start == replacement.range.end || delta.deletedRange.end == replacement.range.end) {
+            // The deleted range is touching the end of the replacement.
+            updatedReplacements.add(replacement);
+          } else if (delta.deletedRange.start == replacement.range.start || delta.deletedRange.end == replacement.range.start) {
+            // The deleted range is touching the beginning of the replacement.
             updatedReplacements.add(
               replacement.copy(
                 range: TextRange(
@@ -943,69 +971,49 @@ class ReplacementTextEditingController extends TextEditingController {
                 ),
               ),
             );
-          } else if (delta.deletedRange.start == replacement.range.start ||
-              delta.deletedRange.start == replacement.range.end ||
-              delta.deletedRange.end == replacement.range.start ||
-              delta.deletedRange.end == replacement.range.end) {
-            print('updating ranges that are touching the deletion');
-
-            // If the replacement is a textspan, then merge the attributes and ranges into one.
-            // If they are of different type then, simply don't update them.
-            if (delta.deletedRange.start == replacement.range.end || delta.deletedRange.end == replacement.range.end) {
-              // The deleted range is touching the end of the replacement.
-              updatedReplacements.add(replacement);
-            } else if (delta.deletedRange.start == replacement.range.start || delta.deletedRange.end == replacement.range.start) {
-              // The deleted range is touching the beginning of the replacement.
-              updatedReplacements.add(
-                replacement.copy(
-                  range: TextRange(
-                    start: replacement.range.start - delta.textDeleted.length,
-                    end: replacement.range.end - delta.textDeleted.length,
-                  ),
-                ),
-              );
-            }
           }
-        } else if (delta is TextEditingDeltaReplacement) {
-          if (delta.replacedRange.start > replacement.range.start &&
-              delta.replacedRange.end < replacement.range.end) {
-            // Update range that falls inclusively inside the diff range.
-            print('updating inclusive range on replacement');
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start,
-                  end: replacement.range.end + 1,
-                ),
-              ),
-            );
-          } else if (delta.replacedRange.end > replacement.range.end &&
-              delta.replacedRange.start > replacement.range.end) {
-            print('updating replacements that happened before replacement');
-            updatedReplacements.add(replacement);
-            // print(replacement);
-          } else if (delta.replacedRange.start < replacement.range.start) {
-            // Update ranges that falls after the diff range.
-            print('updating replacements that happened after replacement');
-            print('not sure about this case');
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start + delta.replacementText.length,
-                  end: replacement.range.end + delta.replacementText.length,
-                ),
-              ),
-            );
-          }
-        } else if (delta is TextEditingDeltaNonTextUpdate) {
-          print('sync non text update');
         }
+      } else if (delta is TextEditingDeltaReplacement) {
+        if (delta.replacedRange.start > replacement.range.start &&
+            delta.replacedRange.end < replacement.range.end) {
+          // Update range that falls inclusively inside the diff range.
+          //print('updating inclusive range on replacement');
+          updatedReplacements.add(
+            replacement.copy(
+              range: TextRange(
+                start: replacement.range.start,
+                end: replacement.range.end + 1,
+              ),
+            ),
+          );
+        } else if (delta.replacedRange.end > replacement.range.end &&
+            delta.replacedRange.start > replacement.range.end) {
+          //print('updating replacements that happened before replacement');
+          updatedReplacements.add(replacement);
+          // print(replacement);
+        } else if (delta.replacedRange.start < replacement.range.start) {
+          // Update ranges that falls after the diff range.
+          //print('updating replacements that happened after replacement');
+          //print('not sure about this case');
+          final int replacedLength = delta.replacedRange.end - delta.replacedRange.start;
+          final int change = delta.replacementText.length - replacedLength;
+          updatedReplacements.add(
+            replacement.copy(
+              range: TextRange(
+                start: replacement.range.start + change,
+                end: replacement.range.end + change,
+              ),
+            ),
+          );
+        }
+      } else if (delta is TextEditingDeltaNonTextUpdate) {
+        //print('sync non text update');
       }
+    }
 
-      if (updatedReplacements.isNotEmpty) {
-        replacements!.clear();
-        replacements!.addAll(updatedReplacements);
-      }
+    if (updatedReplacements.isNotEmpty) {
+      replacements!.clear();
+      replacements!.addAll(updatedReplacements);
     }
   }
 
@@ -1019,8 +1027,8 @@ class ReplacementTextEditingController extends TextEditingController {
         !withComposing ||
         value.isComposingRangeValid);
 
-    print('beginning');
-    print(replacements!.length);
+    //print('beginning buildTextSpan');
+    //print(replacements!.length);
 
     // Keep a mapping of TextRanges to the InlineSpan to replace it with.
     final Map<TextRange, InlineSpan> rangeSpanMapping =
@@ -1047,7 +1055,7 @@ class ReplacementTextEditingController extends TextEditingController {
     // Iterate through TextEditingInlineSpanReplacements, handling overlapping
     // replacements and mapping them towards a generated InlineSpan.
     if (replacements != null) {
-      print('replacements not null');
+      //print('replacements not null');
       for (final TextEditingInlineSpanReplacement replacement
           in replacements!) {
         _addToMappingWithOverlaps(
@@ -1058,7 +1066,7 @@ class ReplacementTextEditingController extends TextEditingController {
             value.text);
       }
     } else {
-      print('replacements is null');
+      //print('replacements is null');
     }
     // If the composing range is out of range for the current text, ignore it to
     // preserve the tree integrity, otherwise in release mode a RangeError will
@@ -1124,7 +1132,7 @@ class ReplacementTextEditingController extends TextEditingController {
     }
 
     if (overlap) {
-      print('there is an overlap');
+      //print('there is an overlap');
       InlineSpan? generatedReplacement =
           generator(matchedRange.textInside(text), matchedRange);
       InlineSpan? previousGeneratedReplacement = rangeSpanMapping[matchedRange];
@@ -1139,7 +1147,7 @@ class ReplacementTextEditingController extends TextEditingController {
         TextStyle? prevRepStyle = previousGeneratedReplacementTextSpan.style;
         String? text = generatedReplacementTextSpan.text;
 
-        print('the overlap is of textspans...attempting to merge the styles');
+        //print('the overlap is of textspans...attempting to merge the styles');
 
         if (text != null && genRepStyle != null && prevRepStyle != null) {
           final TextStyle mergedReplacementStyle =
