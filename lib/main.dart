@@ -1,5 +1,6 @@
-import 'package:basic_text_input_client_sample/basic_text_input_client.dart';
 import 'package:flutter/material.dart';
+
+import 'basic_text_field.dart';
 
 void main() {
   runApp(const MyApp());
@@ -47,6 +48,7 @@ class _MyHomePageState extends State<MyHomePage> {
           textAlign: TextAlign.left,
           focusNode: _focusNode,
           style: const TextStyle(
+            color: Colors.black,
             fontSize: 26.0,
           ),
         ),

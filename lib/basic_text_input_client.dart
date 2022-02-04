@@ -1,190 +1,11 @@
 import 'dart:ui' as ui hide TextStyle;
 
-import 'package:basic_text_input_client_sample/delta_text_selection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 
-class _TextFieldSelectionGestureDetectorBuilder extends TextSelectionGestureDetectorBuilderCustom {
-  _TextFieldSelectionGestureDetectorBuilder({
-    required _BasicTextFieldState state,
-  }) : _state = state,
-        super(delegate: state);
-
-  final _BasicTextFieldState _state;
-
-  @override
-  void onForcePressStart(ForcePressDetails details) {
-    super.onForcePressStart(details);
-    if (delegate.selectionEnabled && shouldShowSelectionToolbar) {
-      editableText.showToolbar();
-    }
-  }
-
-  @override
-  void onForcePressEnd(ForcePressDetails details) {
-    // Not required.
-  }
-
-  @override
-  void onSingleLongTapMoveUpdate(LongPressMoveUpdateDetails details) {
-    if (delegate.selectionEnabled) {
-      switch (Theme.of(_state.context).platform) {
-        case TargetPlatform.iOS:
-        case TargetPlatform.macOS:
-          renderEditable.selectPositionAt(
-            from: details.globalPosition,
-            cause: SelectionChangedCause.longPress,
-          );
-          break;
-        case TargetPlatform.android:
-        case TargetPlatform.fuchsia:
-        case TargetPlatform.linux:
-        case TargetPlatform.windows:
-          renderEditable.selectWordsInRange(
-            from: details.globalPosition - details.offsetFromOrigin,
-            to: details.globalPosition,
-            cause: SelectionChangedCause.longPress,
-          );
-          break;
-      }
-    }
-  }
-
-  @override
-  void onSingleTapUp(TapUpDetails details) {
-    editableText.hideToolbar();
-    super.onSingleTapUp(details);
-    _state._requestKeyboard();
-    // _state.widget.onTap?.call();
-  }
-
-  @override
-  void onSingleLongTapStart(LongPressStartDetails details) {
-    if (delegate.selectionEnabled) {
-      switch (Theme.of(_state.context).platform) {
-        case TargetPlatform.iOS:
-        case TargetPlatform.macOS:
-          renderEditable.selectPositionAt(
-            from: details.globalPosition,
-            cause: SelectionChangedCause.longPress,
-          );
-          break;
-        case TargetPlatform.android:
-        case TargetPlatform.fuchsia:
-        case TargetPlatform.linux:
-        case TargetPlatform.windows:
-          renderEditable.selectWord(cause: SelectionChangedCause.longPress);
-          Feedback.forLongPress(_state.context);
-          break;
-      }
-    }
-  }
-}
-
-class BasicTextField extends StatefulWidget {
-  const BasicTextField({
-    Key? key,
-    TextInputType? keyboardType,
-    required this.controller,
-    required this.style,
-    required this.focusNode,
-    required this.textAlign,
-    this.textDirection,
-    this.textInputAction,
-    this.maxLines = 1,
-  })  : keyboardType = keyboardType ??
-            (maxLines == 1 ? TextInputType.text : TextInputType.multiline),
-        super(key: key);
-
-  final TextEditingController controller;
-
-  final TextStyle style;
-
-  final FocusNode focusNode;
-
-  final TextAlign textAlign;
-
-  final TextDirection? textDirection;
-
-  final TextInputAction? textInputAction;
-
-  final TextInputType? keyboardType;
-
-  final int? maxLines;
-
-  @override
-  State<StatefulWidget> createState() => _BasicTextFieldState();
-}
-
-class _BasicTextFieldState extends State<BasicTextField> implements TextSelectionGestureDetectorBuilderDelegateCustom {
-  @override
-  final GlobalKey<BasicTextInputClientState> basicTextInputClientKey = GlobalKey<BasicTextInputClientState>();
-
-  BasicTextInputClientState? get _basicTextInputClient => basicTextInputClientKey.currentState;
-
-  late _TextFieldSelectionGestureDetectorBuilder _selectionGestureDetectorBuilder;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectionGestureDetectorBuilder = _TextFieldSelectionGestureDetectorBuilder(state: this);
-  }
-
-  @override
-  bool get forcePressEnabled => true;
-
-  @override
-  bool get selectionEnabled => true;
-
-  void _requestKeyboard() {
-    _basicTextInputClient?.requestKeyboard();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Widget child = Container(
-      width: 350.0,
-      height: 250.0,
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.blueAccent),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: BasicTextInputClient(
-        key: basicTextInputClientKey,
-        style: widget.style,
-        controller: widget.controller,
-        textAlign: widget.textAlign,
-        focusNode: widget.focusNode,
-      ),
-    );
-
-    return FocusTrapArea(
-      focusNode: widget.focusNode,
-      child: AnimatedBuilder(
-        animation: widget.controller,
-        builder: (BuildContext context, Widget? child) {
-          return GestureDetector(
-            onTap: () {
-              if (!widget.controller.selection.isValid) {
-                widget.controller.selection = TextSelection.collapsed(offset: widget.controller.text.length);
-              }
-              _requestKeyboard();
-            },
-            child: child,
-          );
-        },
-        child: _selectionGestureDetectorBuilder.buildGestureDetector(
-          behavior: HitTestBehavior.translucent,
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
 class BasicTextInputClient extends StatefulWidget {
-  const BasicTextInputClient({
+  BasicTextInputClient({
     Key? key,
     TextInputType? keyboardType,
     required this.controller,
@@ -194,8 +15,7 @@ class BasicTextInputClient extends StatefulWidget {
     this.textDirection,
     this.textInputAction,
     this.maxLines = 1,
-  })  : keyboardType = keyboardType ??
-            (maxLines == 1 ? TextInputType.text : TextInputType.multiline),
+  })  : keyboardType = keyboardType ?? _inferKeyboardType(maxLines: maxLines),
         super(key: key);
 
   final TextEditingController controller;
@@ -210,9 +30,19 @@ class BasicTextInputClient extends StatefulWidget {
 
   final TextInputAction? textInputAction;
 
-  final TextInputType? keyboardType;
+  final TextInputType keyboardType;
 
   final int? maxLines;
+
+  // Infer the keyboard type of an `EditableText` if it's not specified.
+  static TextInputType _inferKeyboardType({
+    required int? maxLines,
+  }) {
+    if (maxLines == null) {
+      return TextInputType.multiline;
+    }
+    return maxLines == 1 ? TextInputType.text : TextInputType.multiline;
+  }
 
   @override
   BasicTextInputClientState createState() => BasicTextInputClientState();
@@ -243,11 +73,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
   TextInputConnection? _textInputConnection;
   TextEditingValue? _lastKnownRemoteTextEditingValue;
   bool get _hasInputConnection => _textInputConnection?.attached ?? false;
-
-  TextEditingDelta lastTextEditingDelta = const TextEditingDeltaNonTextUpdate(
-      oldText: '',
-      selection: TextSelection.collapsed(offset: -1),
-      composing: TextRange.empty);
 
   @override
   void initState() {
@@ -360,11 +185,12 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
       _textInputConnection = TextInput.attach(
         this,
         TextInputConfiguration(
+          inputType: widget.keyboardType,
           enableDeltaModel: true,
-          inputAction: widget.textInputAction ??
-              (widget.keyboardType == TextInputType.multiline
+          inputAction: widget.textInputAction ?? (widget.keyboardType == TextInputType.multiline
                   ? TextInputAction.newline
-                  : TextInputAction.done),
+                  : TextInputAction.done
+              ),
         ),
       );
 
@@ -405,7 +231,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
         // If this is a multiline EditableText, do nothing for a "newline"
         // action; The newline is already inserted. Otherwise, finalize
         // editing.
-        if (!_isMultiline) _finalizeEditing(action, shouldUnfocus: true);
+        if (!_isMultiline) {
+          _finalizeEditing(action, shouldUnfocus: true);
+        }
         break;
       case TextInputAction.done:
       case TextInputAction.go:
@@ -478,7 +306,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     TextEditingValue value = _value;
 
     for (final TextEditingDelta delta in textEditingDeltas) {
-      lastTextEditingDelta = delta;
       value = delta.apply(value);
     }
 
@@ -540,6 +367,14 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     // TODO: implement userUpdateTextEditingValue
   }
 
+  TextSpan buildTextSpan() {
+    return widget.controller.buildTextSpan(
+      context: context,
+      style: widget.style,
+      withComposing: _hasFocus,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     _focusAttachment!.reparent();
@@ -550,8 +385,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
         viewportBuilder: (BuildContext context, ViewportOffset position) {
           return _Editable(
             key: _editableKey,
-            inlineSpan: widget.controller
-                .buildTextSpan(context: context, withComposing: true),
+            inlineSpan: buildTextSpan(),
             value: _value,
             startHandleLayerLink: _startHandleLayerLink,
             endHandleLayerLink: _endHandleLayerLink,
@@ -568,6 +402,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
             obscuringCharacter: '•',
             obscureText: false,
             autocorrect: true,
+            selectionColor: Colors.blue.withOpacity(0.40),
             smartDashesType: SmartDashesType.disabled,
             smartQuotesType: SmartQuotesType.disabled,
             enableSuggestions: true,
@@ -587,6 +422,16 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
   }
 
   void showToolbar() {}
+
+  @override
+  void insertTextPlaceholder(ui.Size size) {
+    // TODO: implement insertTextPlaceholder
+  }
+
+  @override
+  void removeTextPlaceholder() {
+    // TODO: implement removeTextPlaceholder
+  }
 }
 
 class _Editable extends MultiChildRenderObjectWidget {
@@ -782,99 +627,5 @@ class _Editable extends MultiChildRenderObjectWidget {
       ..promptRectColor = promptRectColor
       ..clipBehavior = clipBehavior
       ..setPromptRectRange(promptRectRange);
-  }
-}
-
-class DeltaDisplay extends StatelessWidget {
-  const DeltaDisplay({required this.delta});
-  final TextEditingDelta delta;
-
-  @override
-  Widget build(BuildContext context) {
-    const TextStyle textStyle = TextStyle(fontWeight: FontWeight.bold);
-    final TextEditingDelta lastTextEditingDelta = delta;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          'Delta class type: ' + lastTextEditingDelta.runtimeType.toString(),
-          style: textStyle,
-        ),
-        Text(
-          'Delta old text: ' + lastTextEditingDelta.oldText,
-          style: textStyle,
-        ),
-        if (lastTextEditingDelta is TextEditingDeltaInsertion)
-          Text(
-            'Delta inserted text: ' + (lastTextEditingDelta).textInserted,
-            style: textStyle,
-          ),
-        if (lastTextEditingDelta is TextEditingDeltaInsertion)
-          Text(
-            'Delta insertion offset: ' +
-                (lastTextEditingDelta).insertionOffset.toString(),
-            style: textStyle,
-          ),
-        if (lastTextEditingDelta is TextEditingDeltaDeletion)
-          Text(
-            'Delta deleted text: ' + (lastTextEditingDelta).textDeleted,
-            style: textStyle,
-          ),
-        if (lastTextEditingDelta is TextEditingDeltaDeletion)
-          Text(
-            'Delta beginning of deleted range: ' +
-                (lastTextEditingDelta).deletedRange.start.toString(),
-            style: textStyle,
-          ),
-        if (lastTextEditingDelta is TextEditingDeltaDeletion)
-          Text(
-            'Delta end of deleted range: ' +
-                (lastTextEditingDelta).deletedRange.end.toString(),
-            style: textStyle,
-          ),
-        if (lastTextEditingDelta is TextEditingDeltaReplacement)
-          Text(
-            'Delta text being replaced: ' + (lastTextEditingDelta).textReplaced,
-            style: textStyle,
-          ),
-        if (lastTextEditingDelta is TextEditingDeltaReplacement)
-          Text(
-              'Delta replacement source text: ' +
-                  (lastTextEditingDelta).replacementText,
-              style: textStyle),
-        if (lastTextEditingDelta is TextEditingDeltaReplacement)
-          Text(
-            'Delta beginning of replaced range: ' +
-                (lastTextEditingDelta).replacedRange.start.toString(),
-            style: textStyle,
-          ),
-        if (lastTextEditingDelta is TextEditingDeltaReplacement)
-          Text(
-            'Delta end of replaced range: ' +
-                (lastTextEditingDelta).replacedRange.end.toString(),
-            style: textStyle,
-          ),
-        Text(
-          'Delta beginning of new selection: ' +
-              lastTextEditingDelta.selection.start.toString(),
-          style: textStyle,
-        ),
-        Text(
-          'Delta end of new selection: ' +
-              lastTextEditingDelta.selection.end.toString(),
-          style: textStyle,
-        ),
-        Text(
-          'Delta beginning of new composing: ' +
-              lastTextEditingDelta.composing.start.toString(),
-          style: textStyle,
-        ),
-        Text(
-          'Delta end of new composing: ' +
-              lastTextEditingDelta.composing.start.toString(),
-          style: textStyle,
-        ),
-      ],
-    );
   }
 }
