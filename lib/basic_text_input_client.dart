@@ -421,8 +421,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     );
   }
 
-  void showToolbar() {}
-
   @override
   void insertTextPlaceholder(ui.Size size) {
     // TODO: implement insertTextPlaceholder
@@ -431,6 +429,11 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
   @override
   void removeTextPlaceholder() {
     // TODO: implement removeTextPlaceholder
+  }
+
+  @override
+  void showToolbar() {
+    // TODO: implement showToolbar
   }
 }
 
