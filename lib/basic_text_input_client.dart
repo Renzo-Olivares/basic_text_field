@@ -1,5 +1,6 @@
 import 'dart:ui' as ui hide TextStyle;
 
+import 'package:basic_text_input_client_sample/replacement_text_editing_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -319,6 +320,12 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     }
 
     _value = value;
+
+    if (widget.controller is ReplacementTextEditingController) {
+      for (final TextEditingDelta delta in textEditingDeltas) {
+        (widget.controller as ReplacementTextEditingController).syncReplacementRanges(delta);
+      }
+    }
   }
 
   @override
