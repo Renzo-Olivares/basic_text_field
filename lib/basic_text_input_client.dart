@@ -100,7 +100,7 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
   }
 
   void _updateTextOverlay() {
-    WidgetsBinding.instance!.addPostFrameCallback((timeStamp) {
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
       setState(() {
         _updateCaret();
       });
@@ -546,6 +546,21 @@ class _BasicTextInputClientState extends State<BasicTextInputClient>
   @override
   void updateFloatingCursor(RawFloatingCursorPoint point) {
     // TODO: implement updateFloatingCursor
+  }
+
+  @override
+  void insertTextPlaceholder(Size size) {
+    // TODO: implement insertTextPlaceholder
+  }
+
+  @override
+  void removeTextPlaceholder() {
+    // TODO: implement removeTextPlaceholder
+  }
+
+  @override
+  void showToolbar() {
+    // TODO: implement showToolbar
   }
 }
 
