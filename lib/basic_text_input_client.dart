@@ -1,31 +1,36 @@
-import 'package:flutter/cupertino.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 /// A basic text input client. An implementation of [DeltaTextInputClient] meant to
 /// send/receive information from the framework to the platform's text input plugin
 /// and vice-versa.
 class BasicTextInputClient extends StatefulWidget {
-  BasicTextInputClient({required this.controller, required this.style});
+  BasicTextInputClient({
+    Key? key,
+    required this.controller,
+    required this.style,
+    required this.focusNode,
+  }) : super(key: key);
 
   final TextEditingController controller;
   final TextStyle style;
+  final FocusNode focusNode;
 
   @override
-  State<BasicTextInputClient> createState() => _BasicTextInputClientState();
+  State<BasicTextInputClient> createState() => BasicTextInputClientState();
 }
 
-class _BasicTextInputClientState extends State<BasicTextInputClient> implements DeltaTextInputClient {
+class BasicTextInputClientState extends State<BasicTextInputClient> implements DeltaTextInputClient {
+  final GlobalKey _textKey = GlobalKey();
+
   @override
-  Widget build(BuildContext context) {
-    return Text.rich(
-        widget.controller.buildTextSpan(
-            context: context,
-            style: widget.style,
-            withComposing: false,
-        ),
-    );
+  void initState() {
+    // TODO: implement initState
+    super.initState();
+    widget.focusNode.addListener(_handleFocusChanged);
   }
 
+  /// [DeltaTextInputClient] method implementations.
   @override
   void connectionClosed() {
     // TODO: implement connectionClosed
@@ -82,5 +87,40 @@ class _BasicTextInputClientState extends State<BasicTextInputClient> implements 
   @override
   void updateFloatingCursor(RawFloatingCursorPoint point) {
     // TODO: implement updateFloatingCursor
+  }
+
+  /// Field focus + keyboard request.
+  bool get _hasFocus => widget.focusNode.hasFocus;
+
+  void requestKeyboard() {
+    if (_hasFocus) {
+      /// TODO: open input connection.
+    } else {
+      widget.focusNode.requestFocus();
+    }
+  }
+
+  void _handleFocusChanged() {
+    /// TODO: open/close input connection.
+    if (_hasFocus) {
+      print('we now have focus');
+    } else {
+      print('we lost focus');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      focusNode: widget.focusNode,
+      child: Text.rich(
+        widget.controller.buildTextSpan(
+          context: context,
+          style: widget.style,
+          withComposing: false,
+        ),
+        key: _textKey,
+      ),
+    );
   }
 }

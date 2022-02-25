@@ -32,6 +32,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +44,7 @@ class _MyHomePageState extends State<MyHomePage> {
         child: BasicTextField(
           controller: _controller,
           style: const TextStyle(color: Colors.black),
+          focusNode: _focusNode,
         ),
       ),
     );
