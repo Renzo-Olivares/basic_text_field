@@ -42,7 +42,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> implements D
 
   @override
   // TODO: implement currentTextEditingValue
-  TextEditingValue? get currentTextEditingValue => throw UnimplementedError();
+  TextEditingValue? get currentTextEditingValue => _value;
 
   @override
   void insertTextPlaceholder(Size size) {
@@ -89,12 +89,66 @@ class BasicTextInputClientState extends State<BasicTextInputClient> implements D
     // TODO: implement updateFloatingCursor
   }
 
+  /// Open/close [DeltaTextInputClient]
+  TextInputConnection? _textInputConnection;
+  bool get _hasInputConnection => _textInputConnection?.attached ?? false;
+  TextEditingValue get _value => widget.controller.value;
+
+  void _openInputConnection() {
+    // Open an input connection if one does not already exist, as well as set
+    // its style. If one is active then show it.
+    if (!_hasInputConnection) {
+      final TextEditingValue localValue = _value;
+
+      _textInputConnection = TextInput.attach(
+        this,
+        const TextInputConfiguration(
+          enableDeltaModel: true,
+          inputAction: TextInputAction.newline,
+          inputType: TextInputType.multiline,
+        ),
+      );
+      final TextStyle style = widget.style;
+      _textInputConnection!
+        ..setStyle(
+          fontFamily: style.fontFamily,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          textDirection: _textDirection, // make this variable.
+          textAlign: TextAlign.left, // make this variable.
+        )
+        ..setEditingState(localValue)
+        ..show();
+    } else {
+      _textInputConnection!.show();
+    }
+  }
+
+  void _closeInputConnectionIfNeeded() {
+    // Close input connection if one is active.
+    if (_hasInputConnection) {
+      _textInputConnection!.close();
+      _textInputConnection = null;
+    }
+  }
+
+  void _openOrCloseInputConnectionIfNeeded() {
+    // Open input connection on gaining focus.
+    // Close input connection on focus loss.
+    if (_hasFocus && widget.focusNode.consumeKeyboardToken()) {
+      _openInputConnection();
+    } else if (!_hasFocus) {
+      _closeInputConnectionIfNeeded();
+      widget.controller.clearComposing();
+    }
+  }
+
   /// Field focus + keyboard request.
   bool get _hasFocus => widget.focusNode.hasFocus;
 
   void requestKeyboard() {
     if (_hasFocus) {
-      /// TODO: open input connection.
+      _openInputConnection();
     } else {
       widget.focusNode.requestFocus();
     }
@@ -102,12 +156,16 @@ class BasicTextInputClientState extends State<BasicTextInputClient> implements D
 
   void _handleFocusChanged() {
     /// TODO: open/close input connection.
+    _openOrCloseInputConnectionIfNeeded();
     if (_hasFocus) {
       print('we now have focus');
     } else {
       print('we lost focus');
     }
   }
+
+  /// Misc.
+  TextDirection get _textDirection => Directionality.of(context);
 
   @override
   Widget build(BuildContext context) {
