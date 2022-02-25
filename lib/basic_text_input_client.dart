@@ -191,13 +191,16 @@ class BasicTextInputClientState extends State<BasicTextInputClient> implements D
   Widget build(BuildContext context) {
     return Focus(
       focusNode: widget.focusNode,
-      child: Text.rich(
-        widget.controller.buildTextSpan(
-          context: context,
-          style: widget.style,
-          withComposing: false,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.vertical,
+        child: Text.rich(
+          widget.controller.buildTextSpan(
+            context: context,
+            style: widget.style,
+            withComposing: false,
+          ),
+          key: _textKey,
         ),
-        key: _textKey,
       ),
     );
   }
