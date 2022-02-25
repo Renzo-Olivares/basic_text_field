@@ -28,6 +28,13 @@ class BasicTextInputClientState extends State<BasicTextInputClient> implements D
     // TODO: implement initState
     super.initState();
     widget.focusNode.addListener(_handleFocusChanged);
+    widget.controller.addListener(_didChangeTextEditingValue);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_didChangeTextEditingValue);
+    super.dispose();
   }
 
   /// [DeltaTextInputClient] method implementations.
@@ -75,13 +82,24 @@ class BasicTextInputClientState extends State<BasicTextInputClient> implements D
   }
 
   @override
-  void updateEditingValue(TextEditingValue value) {
-    // TODO: implement updateEditingValue
-  }
+  void updateEditingValue(TextEditingValue value) { /* Not using */}
 
   @override
   void updateEditingValueWithDeltas(List<TextEditingDelta> textEditingDeltas) {
-    // TODO: implement updateEditingValueWithDeltas
+    TextEditingValue value = _value;
+
+    for (final TextEditingDelta delta in textEditingDeltas) {
+      value = delta.apply(value);
+    }
+
+    if (value == _value) {
+      // This is possible, for example, when the numeric keyboard is input,
+      // the engine will notify twice for the same value.
+      // Track at https://github.com/flutter/flutter/issues/65811
+      return;
+    }
+
+    _value = value;
   }
 
   @override
@@ -93,6 +111,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient> implements D
   TextInputConnection? _textInputConnection;
   bool get _hasInputConnection => _textInputConnection?.attached ?? false;
   TextEditingValue get _value => widget.controller.value;
+  set _value(TextEditingValue value) {
+    widget.controller.value = value;
+  }
 
   void _openInputConnection() {
     // Open an input connection if one does not already exist, as well as set
@@ -155,17 +176,16 @@ class BasicTextInputClientState extends State<BasicTextInputClient> implements D
   }
 
   void _handleFocusChanged() {
-    /// TODO: open/close input connection.
+    // Open or close input connection depending on focus.
     _openOrCloseInputConnectionIfNeeded();
-    if (_hasFocus) {
-      print('we now have focus');
-    } else {
-      print('we lost focus');
-    }
   }
 
   /// Misc.
   TextDirection get _textDirection => Directionality.of(context);
+
+  void _didChangeTextEditingValue() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
