@@ -53,6 +53,10 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     with TextSelectionDelegate
     implements DeltaTextInputClient {
   final GlobalKey _editableKey = GlobalKey();
+
+  /// TODO: Better documentation.
+  ///
+  /// For text selection overlay.
   final LayerLink _startHandleLayerLink = LayerLink();
   final LayerLink _endHandleLayerLink = LayerLink();
 
@@ -62,15 +66,22 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
   /// when [RenderEditable.ignorePointer] is true.
   RenderEditable get renderEditable => _editableKey.currentContext!.findRenderObject()! as RenderEditable;
 
+  /// TODO: Better documentation.
+  ///
+  /// For text field focus.
+  FocusAttachment? _focusAttachment;
+  bool get _hasFocus => widget.focusNode.hasFocus;
+
   TextEditingValue get _value => widget.controller.value;
   set _value(TextEditingValue value) {
     widget.controller.value = value;
   }
 
-  FocusAttachment? _focusAttachment;
-  bool get _hasFocus => widget.focusNode.hasFocus;
   bool get _isMultiline => widget.maxLines != 1;
 
+  /// TODO: Better documentation.
+  ///
+  /// For text input client connection.
   TextInputConnection? _textInputConnection;
   TextEditingValue? _lastKnownRemoteTextEditingValue;
   bool get _hasInputConnection => _textInputConnection?.attached ?? false;
