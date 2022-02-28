@@ -28,6 +28,7 @@ class _BasicTextFieldState extends State<BasicTextField> {
     return FocusTrapArea(
       focusNode: widget.focusNode,
       child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
         onTap: () {
           _textInputClient!.requestKeyboard();
         },
