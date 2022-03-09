@@ -1,21 +1,32 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+
+/// Signature for the callback that reports when the user changes the selection
+/// (including the cursor location).
+typedef SelectionChangedCallback = void Function(TextSelection selection, SelectionChangedCause? cause);
 
 /// A basic text input client. An implementation of [DeltaTextInputClient] meant to
 /// send/receive information from the framework to the platform's text input plugin
 /// and vice-versa.
 class BasicTextInputClient extends StatefulWidget {
-  BasicTextInputClient({
+  const BasicTextInputClient({
     Key? key,
     required this.controller,
     required this.style,
     required this.focusNode,
+    this.selectionControls,
+    required this.onSelectionChanged,
+    required this.showSelectionHandles,
   }) : super(key: key);
 
   final TextEditingController controller;
   final TextStyle style;
   final FocusNode focusNode;
+  final TextSelectionControls? selectionControls;
+  final bool showSelectionHandles;
+  final SelectionChangedCallback onSelectionChanged;
 
   @override
   State<BasicTextInputClient> createState() => BasicTextInputClientState();
@@ -26,7 +37,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   void initState() {
-    // TODO: implement initState
     super.initState();
     widget.focusNode.addListener(_handleFocusChanged);
     widget.controller.addListener(_didChangeTextEditingValue);
@@ -49,7 +59,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   AutofillScope? get currentAutofillScope => throw UnimplementedError();
 
   @override
-  // TODO: implement currentTextEditingValue
   TextEditingValue? get currentTextEditingValue => _value;
 
   @override
@@ -93,6 +102,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       value = delta.apply(value);
     }
 
+    _lastKnownRemoteTextEditingValue = value;
+
     if (value == _value) {
       // This is possible, for example, when the numeric keyboard is input,
       // the engine will notify twice for the same value.
@@ -111,10 +122,15 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   /// Open/close [DeltaTextInputClient]
   TextInputConnection? _textInputConnection;
   bool get _hasInputConnection => _textInputConnection?.attached ?? false;
+
   TextEditingValue get _value => widget.controller.value;
   set _value(TextEditingValue value) {
     widget.controller.value = value;
   }
+
+  // Keep track of the last known text editing value from the engine so we do not
+  // send an update message if we don't have to.
+  TextEditingValue? _lastKnownRemoteTextEditingValue;
 
   void _openInputConnection() {
     // Open an input connection if one does not already exist, as well as set
@@ -141,6 +157,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
         )
         ..setEditingState(localValue)
         ..show();
+
+      _lastKnownRemoteTextEditingValue = localValue;
     } else {
       _textInputConnection!.show();
     }
@@ -151,6 +169,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     if (_hasInputConnection) {
       _textInputConnection!.close();
       _textInputConnection = null;
+      _lastKnownRemoteTextEditingValue = null;
     }
   }
 
@@ -179,14 +198,16 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   void _handleFocusChanged() {
     // Open or close input connection depending on focus.
     _openOrCloseInputConnectionIfNeeded();
+    if (_hasFocus) {
+      if (!_value.selection.isValid) {
+        // Place cursor at the end if the selection is invalid when we receive focus.
+        _handleSelectionChanged(TextSelection.collapsed(offset: _value.text.length), null);
+      }
+    }
   }
 
   /// Misc.
   TextDirection get _textDirection => Directionality.of(context);
-
-  void _didChangeTextEditingValue() {
-    setState(() {});
-  }
 
   TextSpan _buildTextSpan() {
     return widget.controller.buildTextSpan(
@@ -194,6 +215,39 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       style: widget.style,
       withComposing: true,
     );
+  }
+
+  /// For updates to text editing value.
+  void _didChangeTextEditingValue() {
+    _updateRemoteTextEditingValueIfNeeded();
+    _updateOrDisposeOfSelectionOverlayIfNeeded();
+    setState(() {});
+  }
+
+  // When the framework's text editing value changes we should update the text editing
+  // value contained within the selection overlay or we might observe unexpected behavior.
+  void _updateOrDisposeOfSelectionOverlayIfNeeded() {
+    if (_selectionOverlay != null) {
+      if (_hasFocus) {
+        _selectionOverlay!.update(_value);
+      } else {
+        _selectionOverlay!.dispose();
+        _selectionOverlay = null;
+      }
+    }
+  }
+
+  // Only update the platform's text input plugin's text editing value when it has changed
+  // to avoid sending duplicate update messages to the engine.
+  void _updateRemoteTextEditingValueIfNeeded() {
+    if (_lastKnownRemoteTextEditingValue == _value) {
+      return;
+    }
+
+    if (_textInputConnection != null) {
+      _textInputConnection!.setEditingState(_value);
+      _lastKnownRemoteTextEditingValue = _value;
+    }
   }
 
   /// [TextSelectionDelegate] method implementations.
@@ -229,17 +283,94 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   }
 
   @override
-  // TODO: implement textEditingValue
   TextEditingValue get textEditingValue => _value;
 
   @override
   void userUpdateTextEditingValue(TextEditingValue value, SelectionChangedCause cause) {
-    // TODO: implement userUpdateTextEditingValue
+    final bool selectionChanged = _value.selection != value.selection;
+
+    _value = value;
+
+    if (selectionChanged) {
+      _handleSelectionChanged(_value.selection, cause);
+    }
   }
 
   /// For TextSelection.
   final LayerLink _startHandleLayerLink = LayerLink();
   final LayerLink _endHandleLayerLink = LayerLink();
+  final LayerLink _toolbarLayerLink = LayerLink();
+
+  TextSelectionOverlay? _selectionOverlay;
+  RenderEditable get renderEditable => _textKey.currentContext!.findRenderObject()! as RenderEditable;
+
+  void _handleSelectionChanged(TextSelection selection, SelectionChangedCause? cause) {
+    // We return early if the selection is not valid. This can happen when the
+    // text of [EditableText] is updated at the same time as the selection is
+    // changed by a gesture event.
+    if (!widget.controller.isSelectionWithinTextBounds(selection))
+      return;
+
+    widget.controller.selection = selection;
+
+    // This will show the keyboard for all selection changes on the
+    // EditableText except for those triggered by a keyboard input.
+    // Typically BasicTextInputClient shouldn't take user keyboard input if
+    // it's not focused already.
+    switch (cause) {
+      case null:
+      case SelectionChangedCause.doubleTap:
+      case SelectionChangedCause.drag:
+      case SelectionChangedCause.forcePress:
+      case SelectionChangedCause.longPress:
+      case SelectionChangedCause.scribble:
+      case SelectionChangedCause.tap:
+      case SelectionChangedCause.toolbar:
+        requestKeyboard();
+        break;
+      case SelectionChangedCause.keyboard:
+        if (_hasFocus) {
+          requestKeyboard();
+        }
+        break;
+    }
+    if (widget.selectionControls == null) {
+      _selectionOverlay?.dispose();
+      _selectionOverlay = null;
+    } else {
+      if (_selectionOverlay == null) {
+        _selectionOverlay = TextSelectionOverlay(
+          clipboardStatus: null, // TODO: implement.
+          context: context,
+          value: _value,
+          debugRequiredFor: widget,
+          toolbarLayerLink: _toolbarLayerLink,
+          startHandleLayerLink: _startHandleLayerLink,
+          endHandleLayerLink: _endHandleLayerLink,
+          renderObject: renderEditable,
+          selectionControls: widget.selectionControls,
+          selectionDelegate: this,
+          dragStartBehavior: DragStartBehavior.start,
+          onSelectionHandleTapped: () {},
+        );
+      } else {
+        _selectionOverlay!.update(_value);
+      }
+      _selectionOverlay!.handlesVisible = widget.showSelectionHandles;
+      _selectionOverlay!.showHandles();
+    }
+
+    try {
+      widget.onSelectionChanged.call(selection, cause);
+    } catch (exception, stack) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: exception,
+        stack: stack,
+        library: 'widgets',
+        context: ErrorDescription('while calling onSelectionChanged for $cause'),
+      ));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -247,45 +378,48 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       focusNode: widget.focusNode,
       child: Scrollable(
         viewportBuilder: (BuildContext context, ViewportOffset position) {
-          return _Editable(
-            key: _textKey,
-            startHandleLayerLink: _startHandleLayerLink,
-            endHandleLayerLink: _endHandleLayerLink,
-            inlineSpan: _buildTextSpan(),
-            value: _value, // We pass value.selection to RenderEditable.
-            cursorColor: Colors.blue,
-            backgroundCursorColor: Colors.grey[100], // TODO: document.
-            showCursor: ValueNotifier<bool>(true),
-            forceLine: true, // Whether text field will take full line regardless of width.
-            readOnly: false, // editable text-field.
-            hasFocus: _hasFocus,
-            maxLines: null, // multi-line text-field.
-            minLines: null,
-            expands: false, // expands to height of parent.
-            strutStyle: null, // TODO: document.
-            selectionColor: Colors.blue.withOpacity(0.40),
-            textScaleFactor: MediaQuery.textScaleFactorOf(context), // TODO: document.
-            textAlign: TextAlign.left, // TODO: make variable.
-            textDirection: _textDirection,
-            locale: Localizations.maybeLocaleOf(context), // TODO: document.
-            textHeightBehavior: DefaultTextHeightBehavior.of(context), // TODO: make variable.
-            textWidthBasis: TextWidthBasis.parent, // TODO: document.
-            obscuringCharacter: '•',
-            obscureText: false, // This is a non-private text field that does not require obfuscation.
-            offset: position,
-            onCaretChanged: null, // TODO: implement.
-            rendererIgnoresPointer: true, // TODO: document.
-            cursorWidth: 2.0,
-            cursorHeight: null,
-            cursorRadius: const Radius.circular(2.0),
-            cursorOffset: Offset.zero,
-            paintCursorAboveText: false, // TODO: document.
-            enableInteractiveSelection: true, // make true to enable selection on mobile.
-            textSelectionDelegate: this,
-            devicePixelRatio: MediaQuery.of(context).devicePixelRatio, // TODO: document.
-            promptRectRange: null, // TODO: document.
-            promptRectColor: null, // TODO: document.
-            clipBehavior: Clip.hardEdge, // TODO: document.
+          return CompositedTransformTarget(
+            link: _toolbarLayerLink,
+            child: _Editable(
+              key: _textKey,
+              startHandleLayerLink: _startHandleLayerLink,
+              endHandleLayerLink: _endHandleLayerLink,
+              inlineSpan: _buildTextSpan(),
+              value: _value, // We pass value.selection to RenderEditable.
+              cursorColor: Colors.blue,
+              backgroundCursorColor: Colors.grey[100], // TODO: document.
+              showCursor: ValueNotifier<bool>(true),
+              forceLine: true, // Whether text field will take full line regardless of width.
+              readOnly: false, // editable text-field.
+              hasFocus: _hasFocus,
+              maxLines: null, // multi-line text-field.
+              minLines: null,
+              expands: false, // expands to height of parent.
+              strutStyle: null, // TODO: document.
+              selectionColor: Colors.blue.withOpacity(0.40),
+              textScaleFactor: MediaQuery.textScaleFactorOf(context), // TODO: document.
+              textAlign: TextAlign.left, // TODO: make variable.
+              textDirection: _textDirection,
+              locale: Localizations.maybeLocaleOf(context), // TODO: document.
+              textHeightBehavior: DefaultTextHeightBehavior.of(context), // TODO: make variable.
+              textWidthBasis: TextWidthBasis.parent, // TODO: document.
+              obscuringCharacter: '•',
+              obscureText: false, // This is a non-private text field that does not require obfuscation.
+              offset: position,
+              onCaretChanged: null, // TODO: implement.
+              rendererIgnoresPointer: true, // TODO: document.
+              cursorWidth: 2.0,
+              cursorHeight: null,
+              cursorRadius: const Radius.circular(2.0),
+              cursorOffset: Offset.zero,
+              paintCursorAboveText: false, // TODO: document.
+              enableInteractiveSelection: true, // make true to enable selection on mobile.
+              textSelectionDelegate: this,
+              devicePixelRatio: MediaQuery.of(context).devicePixelRatio, // TODO: document.
+              promptRectRange: null, // TODO: document.
+              promptRectColor: null, // TODO: document.
+              clipBehavior: Clip.hardEdge, // TODO: document.
+            ),
           );
         },
       ),
