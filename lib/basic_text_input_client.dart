@@ -239,6 +239,85 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     userUpdateTextEditingValue(value, cause);
   }
 
+  /// Keyboard text editing actions.
+  // TODO(justinmc): Handling of the default text editing shortcuts with deltas
+  // needs to be in the framework somehow.  This should go through some kind of
+  // generic "replace" method like in EditableText.
+  // EditableText converts intents like DeleteCharacterIntent to a generic
+  // ReplaceTextIntent. I wonder if that could be done at a higher level, so
+  // that users could listen to that instead of DeleteCharacterIntent?
+  TextSelection get _selection => _value.selection;
+  late final Map<Type, Action<Intent>> _actions = <Type, Action<Intent>>{
+    DeleteCharacterIntent: CallbackAction<DeleteCharacterIntent>(
+      onInvoke: (DeleteCharacterIntent intent) => _delete(),
+    ),
+    ExtendSelectionByCharacterIntent: CallbackAction<ExtendSelectionByCharacterIntent>(
+      onInvoke: (ExtendSelectionByCharacterIntent intent) => _extendSelection(intent.forward),
+    ),
+  };
+
+  void _delete() {
+    if (_value.text.isEmpty) {
+      return;
+    }
+
+    late final TextRange deletedRange;
+    if (_selection.isCollapsed) {
+      if (_selection.baseOffset == 0) {
+        return;
+      }
+      final int deletedLength = _value.text.substring(0, _selection.baseOffset).characters.last.length;
+      deletedRange = TextRange(
+        start: _selection.baseOffset - deletedLength,
+        end: _selection.baseOffset,
+      );
+    } else {
+      deletedRange = _selection;
+    }
+
+    _userUpdateTextEditingValueWithDelta(
+      TextEditingDeltaDeletion(
+        oldText: _value.text,
+        selection: TextSelection.collapsed(offset: deletedRange.start),
+        composing: TextRange.collapsed(deletedRange.start),
+        deletedRange: deletedRange,
+      ),
+      SelectionChangedCause.keyboard,
+    );
+  }
+
+  void _extendSelection(bool forward) {
+    late final TextSelection selection;
+    if (!_selection.isCollapsed) {
+      final int firstOffset = _selection.isNormalized ? _selection.start : _selection.end;
+      final int lastOffset = _selection.isNormalized ? _selection.end : _selection.start;
+      selection = TextSelection.collapsed(offset: forward ? lastOffset : firstOffset);
+    } else {
+      if (forward && _selection.baseOffset == _value.text.length) {
+        return;
+      }
+      if (!forward && _selection.baseOffset == 0) {
+        return;
+      }
+      final int adjustment = forward
+          ? _value.text.substring(_selection.baseOffset).characters.first.length
+          : -_value.text.substring(0, _selection.baseOffset).characters.last.length;
+      selection = TextSelection.collapsed(
+        offset: _selection.baseOffset + adjustment,
+      );
+    }
+
+    _userUpdateTextEditingValueWithDelta(
+      TextEditingDeltaNonTextUpdate(
+        oldText: _value.text,
+        selection: selection,
+        composing: _value.composing,
+      ),
+      SelectionChangedCause.keyboard,
+    );
+  }
+
+
   /// For updates to text editing value.
   void _didChangeTextEditingValue() {
     _updateRemoteTextEditingValueIfNeeded();
@@ -507,54 +586,57 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: widget.focusNode,
-      child: Scrollable(
-        viewportBuilder: (BuildContext context, ViewportOffset position) {
-          return CompositedTransformTarget(
-            link: _toolbarLayerLink,
-            child: _Editable(
-              key: _textKey,
-              startHandleLayerLink: _startHandleLayerLink,
-              endHandleLayerLink: _endHandleLayerLink,
-              inlineSpan: _buildTextSpan(),
-              value: _value, // We pass value.selection to RenderEditable.
-              cursorColor: Colors.blue,
-              backgroundCursorColor: Colors.grey[100], // TODO: document.
-              showCursor: ValueNotifier<bool>(true),
-              forceLine: true, // Whether text field will take full line regardless of width.
-              readOnly: false, // editable text-field.
-              hasFocus: _hasFocus,
-              maxLines: null, // multi-line text-field.
-              minLines: null,
-              expands: false, // expands to height of parent.
-              strutStyle: null, // TODO: document.
-              selectionColor: Colors.blue.withOpacity(0.40),
-              textScaleFactor: MediaQuery.textScaleFactorOf(context), // TODO: document.
-              textAlign: TextAlign.left, // TODO: make variable.
-              textDirection: _textDirection,
-              locale: Localizations.maybeLocaleOf(context), // TODO: document.
-              textHeightBehavior: DefaultTextHeightBehavior.of(context), // TODO: make variable.
-              textWidthBasis: TextWidthBasis.parent, // TODO: document.
-              obscuringCharacter: '•',
-              obscureText: false, // This is a non-private text field that does not require obfuscation.
-              offset: position,
-              onCaretChanged: null, // TODO: implement.
-              rendererIgnoresPointer: true, // TODO: document.
-              cursorWidth: 2.0,
-              cursorHeight: null,
-              cursorRadius: const Radius.circular(2.0),
-              cursorOffset: Offset.zero,
-              paintCursorAboveText: false, // TODO: document.
-              enableInteractiveSelection: true, // make true to enable selection on mobile.
-              textSelectionDelegate: this,
-              devicePixelRatio: MediaQuery.of(context).devicePixelRatio, // TODO: document.
-              promptRectRange: null, // TODO: document.
-              promptRectColor: null, // TODO: document.
-              clipBehavior: Clip.hardEdge, // TODO: document.
-            ),
-          );
-        },
+    return Actions(
+      actions: _actions,
+      child: Focus(
+        focusNode: widget.focusNode,
+        child: Scrollable(
+          viewportBuilder: (BuildContext context, ViewportOffset position) {
+            return CompositedTransformTarget(
+              link: _toolbarLayerLink,
+              child: _Editable(
+                key: _textKey,
+                startHandleLayerLink: _startHandleLayerLink,
+                endHandleLayerLink: _endHandleLayerLink,
+                inlineSpan: _buildTextSpan(),
+                value: _value, // We pass value.selection to RenderEditable.
+                cursorColor: Colors.blue,
+                backgroundCursorColor: Colors.grey[100], // TODO: document.
+                showCursor: ValueNotifier<bool>(true),
+                forceLine: true, // Whether text field will take full line regardless of width.
+                readOnly: false, // editable text-field.
+                hasFocus: _hasFocus,
+                maxLines: null, // multi-line text-field.
+                minLines: null,
+                expands: false, // expands to height of parent.
+                strutStyle: null, // TODO: document.
+                selectionColor: Colors.blue.withOpacity(0.40),
+                textScaleFactor: MediaQuery.textScaleFactorOf(context), // TODO: document.
+                textAlign: TextAlign.left, // TODO: make variable.
+                textDirection: _textDirection,
+                locale: Localizations.maybeLocaleOf(context), // TODO: document.
+                textHeightBehavior: DefaultTextHeightBehavior.of(context), // TODO: make variable.
+                textWidthBasis: TextWidthBasis.parent, // TODO: document.
+                obscuringCharacter: '•',
+                obscureText: false, // This is a non-private text field that does not require obfuscation.
+                offset: position,
+                onCaretChanged: null, // TODO: implement.
+                rendererIgnoresPointer: true, // TODO: document.
+                cursorWidth: 2.0,
+                cursorHeight: null,
+                cursorRadius: const Radius.circular(2.0),
+                cursorOffset: Offset.zero,
+                paintCursorAboveText: false, // TODO: document.
+                enableInteractiveSelection: true, // make true to enable selection on mobile.
+                textSelectionDelegate: this,
+                devicePixelRatio: MediaQuery.of(context).devicePixelRatio, // TODO: document.
+                promptRectRange: null, // TODO: document.
+                promptRectColor: null, // TODO: document.
+                clipBehavior: Clip.hardEdge, // TODO: document.
+              ),
+            );
+          },
+        ),
       ),
     );
   }
