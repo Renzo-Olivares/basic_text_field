@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -34,6 +36,7 @@ class BasicTextInputClient extends StatefulWidget {
 
 class BasicTextInputClientState extends State<BasicTextInputClient> with TextSelectionDelegate implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
+  final ClipboardStatusNotifier? _clipboardStatus = kIsWeb ? null : ClipboardStatusNotifier();
 
   @override
   void initState() {
@@ -56,6 +59,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   // TODO: implement currentAutofillScope
+  // Will not implement.
   AutofillScope? get currentAutofillScope => throw UnimplementedError();
 
   @override
@@ -87,8 +91,18 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   }
 
   @override
-  void showToolbar() {
-    // TODO: implement showToolbar
+  bool showToolbar() {
+    // On the web use provided native dom elements to provide clipboard functionality.
+    if (kIsWeb) {
+      return false;
+    }
+
+    if (_selectionOverlay == null || _selectionOverlay!.toolbarIsVisible) {
+      return false;
+    }
+
+    _selectionOverlay!.showToolbar();
+    return true;
   }
 
   @override
@@ -217,11 +231,28 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     );
   }
 
+  void _userUpdateTextEditingValueWithDelta(TextEditingDelta textEditingDelta, SelectionChangedCause cause) {
+    TextEditingValue value = _value;
+
+    value = textEditingDelta.apply(value);
+
+    userUpdateTextEditingValue(value, cause);
+  }
+
   /// For updates to text editing value.
   void _didChangeTextEditingValue() {
     _updateRemoteTextEditingValueIfNeeded();
     _updateOrDisposeOfSelectionOverlayIfNeeded();
     setState(() {});
+  }
+
+  void _toggleToolbar() {
+    assert(_selectionOverlay != null);
+    if (_selectionOverlay!.toolbarIsVisible) {
+      hideToolbar(false);
+    } else {
+      showToolbar();
+    }
   }
 
   // When the framework's text editing value changes we should update the text editing
@@ -258,28 +289,119 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   void copySelection(SelectionChangedCause cause) {
-    // TODO: implement copySelection
+    final TextSelection copyRange = textEditingValue.selection;
+    if (!copyRange.isValid || copyRange.isCollapsed) {
+      return;
+    }
+    final String text = textEditingValue.text;
+    Clipboard.setData(ClipboardData(text: copyRange.textInside(text)));
+
+    // If copy was done by the text selection toolbar we should hide the toolbar and set the selection
+    // to the end of the copied text.
+    if (cause == SelectionChangedCause.toolbar) {
+      switch (defaultTargetPlatform) {
+        case TargetPlatform.iOS:
+          break;
+        case TargetPlatform.macOS:
+        case TargetPlatform.android:
+        case TargetPlatform.fuchsia:
+        case TargetPlatform.linux:
+        case TargetPlatform.windows:
+          _userUpdateTextEditingValueWithDelta(
+              TextEditingDeltaNonTextUpdate(
+                  oldText: textEditingValue.text,
+                  selection: TextSelection.collapsed(offset: textEditingValue.selection.end),
+                  composing: TextRange.empty,
+              ),
+              cause,
+          );
+          break;
+      }
+      hideToolbar();
+    }
+    _clipboardStatus?.update();
   }
 
   @override
   void cutSelection(SelectionChangedCause cause) {
-    // TODO: implement cutSelection
+    final TextSelection cutRange = textEditingValue.selection;
+    final String text = textEditingValue.text;
+
+    if (cutRange.isCollapsed) {
+      return;
+    }
+    Clipboard.setData(ClipboardData(text: cutRange.textInside(text)));
+    final int lastSelectionIndex = math.min(cutRange.baseOffset, cutRange.extentOffset);
+    _userUpdateTextEditingValueWithDelta(
+      TextEditingDeltaReplacement(
+          oldText: textEditingValue.text,
+          replacementText: '',
+          replacedRange: cutRange,
+          selection: TextSelection.collapsed(offset: lastSelectionIndex),
+          composing: TextRange.empty,
+      ),
+      cause,
+    );
+    if (cause == SelectionChangedCause.toolbar) {
+      hideToolbar();
+    }
+    _clipboardStatus?.update();
   }
 
   @override
   void hideToolbar([bool hideHandles = true]) {
-    // TODO: implement hideToolbar
+    if (hideHandles) {
+      // Hide the handles and the toolbar.
+      _selectionOverlay?.hide();
+    } else if (_selectionOverlay?.toolbarIsVisible ?? false) {
+      // Hide only the toolbar but not the handles.
+      _selectionOverlay?.hideToolbar();
+    }
   }
 
   @override
-  Future<void> pasteText(SelectionChangedCause cause) {
-    // TODO: implement pasteText
-    throw UnimplementedError();
+  Future<void> pasteText(SelectionChangedCause cause) async {
+    final TextSelection pasteRange = textEditingValue.selection;
+    if (!pasteRange.isValid) {
+      return;
+    }
+
+    final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
+    if (data == null) {
+      return;
+    }
+
+    // After the paste, the cursor should be collapsed and located after the
+    // pasted content.
+    final int lastSelectionIndex = math.max(pasteRange.baseOffset, pasteRange.extentOffset);
+
+    _userUpdateTextEditingValueWithDelta(
+      TextEditingDeltaReplacement(
+            oldText: textEditingValue.text,
+            replacementText: data.text!,
+            replacedRange: pasteRange,
+            selection: TextSelection.collapsed(offset: lastSelectionIndex),
+            composing: TextRange.empty,
+      ),
+      cause,
+    );
+
+    if (cause == SelectionChangedCause.toolbar) {
+      hideToolbar();
+    }
   }
 
   @override
   void selectAll(SelectionChangedCause cause) {
-    // TODO: implement selectAll
+    final TextSelection newSelection = _value.selection.copyWith(baseOffset: 0, extentOffset: _value.text.length);
+    _userUpdateTextEditingValueWithDelta(
+      TextEditingDeltaNonTextUpdate(
+          oldText: textEditingValue.text,
+          selection: newSelection,
+          composing: TextRange.empty
+      ),
+      cause,
+    );
   }
 
   @override
@@ -287,7 +409,16 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   void userUpdateTextEditingValue(TextEditingValue value, SelectionChangedCause cause) {
+    if (value == _value) {
+      return;
+    }
+
     final bool selectionChanged = _value.selection != value.selection;
+
+    if (cause == SelectionChangedCause.drag || cause == SelectionChangedCause.longPress) {
+      // Here the change is coming from gestures which call on RenderEditable to change the selection.
+      // TODO: Should we create a delta and apply it here instead of just setting the value?
+    }
 
     _value = value;
 
@@ -340,7 +471,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     } else {
       if (_selectionOverlay == null) {
         _selectionOverlay = TextSelectionOverlay(
-          clipboardStatus: null, // TODO: implement.
+          clipboardStatus: _clipboardStatus,
           context: context,
           value: _value,
           debugRequiredFor: widget,
@@ -351,7 +482,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
           selectionControls: widget.selectionControls,
           selectionDelegate: this,
           dragStartBehavior: DragStartBehavior.start,
-          onSelectionHandleTapped: () {},
+          onSelectionHandleTapped: () {
+            _toggleToolbar();
+          },
         );
       } else {
         _selectionOverlay!.update(_value);

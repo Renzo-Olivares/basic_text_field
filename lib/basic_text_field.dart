@@ -128,6 +128,9 @@ class _BasicTextFieldState extends State<BasicTextField> {
               break;
           }
         },
+        onLongPressEnd: (LongPressEndDetails details) {
+          _textInputClient!.showToolbar();
+        },
         child: Container(
           height: 300,
           width: 300,
