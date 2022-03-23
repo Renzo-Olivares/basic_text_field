@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:deltaclientguide/replacements.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -126,6 +127,12 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     }
 
     _value = value;
+
+    if (widget.controller is ReplacementTextEditingController) {
+      for (final TextEditingDelta delta in textEditingDeltas) {
+        (widget.controller as ReplacementTextEditingController).syncReplacementRanges(delta);
+      }
+    }
   }
 
   @override
@@ -235,6 +242,10 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     TextEditingValue value = _value;
 
     value = textEditingDelta.apply(value);
+
+    if (widget.controller is ReplacementTextEditingController) {
+      (widget.controller as ReplacementTextEditingController).syncReplacementRanges(textEditingDelta);
+    }
 
     userUpdateTextEditingValue(value, cause);
   }
