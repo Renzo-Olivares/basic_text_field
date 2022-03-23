@@ -54,7 +54,13 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   /// [DeltaTextInputClient] method implementations.
   @override
   void connectionClosed() {
-    // TODO: implement connectionClosed
+    if (_hasInputConnection) {
+      _textInputConnection!.connectionClosedReceived();
+      _textInputConnection = null;
+      _lastKnownRemoteTextEditingValue = null;
+      widget.focusNode.unfocus();
+      widget.controller.clearComposing();
+    }
   }
 
   @override
