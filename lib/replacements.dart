@@ -139,72 +139,84 @@ class ReplacementTextEditingController extends TextEditingController {
     }
   }
 
-  /// Update replacement ranges based on information sent from a supplementary
-  /// text model, that syncs asynchronously with the [TextInputClient]'s text model.
+  /// Update replacement ranges based on [TextEditingDelta]'s coming from a
+  /// [DeltaTextInputClient]'s.
   ///
-  /// On a single character insertion, the replacements that ranges fall inclusively
+  /// On a insertion, the replacements that ranges fall inclusively
   /// within the range of the insertion, should be updated to take into account
   /// the insertion that happened within the replacement range. i.e. we expand
   /// the range.
   ///
-  /// On a single character insertion, the replacements that ranges fall after the
+  /// On a insertion, the replacements that ranges fall after the
   /// range of the insertion, should be updated to take into account the insertion
-  /// that occured and the offset it created as a result.
+  /// that occurred and the offset it created as a result.
   ///
-  /// On a single character insertion, the replacements that ranges fall before
+  /// On a insertion, the replacements that ranges fall before
   /// the range of the insertion, should be skipped and not updated as their values
   /// are not offset by the insertion.
   ///
-  /// TODO: Behavior when insertion is at the edges of a replacements range.
+  /// On a insertion, if a replacement range front edge is touched by
+  /// the insertion, the range should be updated with the insertion offset. i.e.
+  /// the replacement range is pushed forward.
   ///
-  /// On a single character deletion, the replacements that ranges fall inclusively
+  /// On a insertion, if a replacement range back edge is touched by
+  /// the insertion offset, nothing should be done. i.e. do not expand the range.
+  ///
+  /// On a deletion, the replacements that ranges fall inclusively
   /// within the range of the deletion, should be updated to take into account
-  /// the deletion that happened within the replacement range. i.e. we contact the range.
+  /// the deletion that happened within the replacement range. i.e. we contract the range.
   ///
-  /// On a single character deletion, the replacement ranges that fall after the
+  /// On a deletion, the replacement ranges that fall after the
   /// ranges of deletion, should be updated to take into account the deletion
-  /// that occured and the offset it created as a result.
+  /// that occurred and the offset it created as a result.
   ///
-  /// On a single character deletion, the replacement ranges that fall before the
+  /// On a deletion, the replacement ranges that fall before the
   /// ranges of deletion, should be skipped and not updated as their values are
   /// not offset by the deletion.
   ///
-  /// TODO: Behavior when deletion is at edges of a replacements range.
+  /// On a replacement, the replacements that ranges fall inclusively
+  /// within the range of the replaced range, should be updated to take into account
+  /// that the replaced range should be un-styled. i.e. we split the replacement ranges
+  /// into two.
+  ///
+  /// On a replacement, the replacement ranges that fall after the
+  /// ranges of the replacement, should be updated to take into account the replacement
+  /// that occurred and the offset it created as a result.
+  ///
+  /// On a replacement, the replacement ranges that fall before the
+  /// ranges of replacement, should be skipped and not updated as their values are
+  /// not offset by the replacement.
   void syncReplacementRanges(TextEditingDelta delta) {
     if (replacements == null) {
       return;
     }
-    //print('syncing ranges for delta $delta');
-    //print(replacements!.length.toString());
+
     if (text.isEmpty) {
       replacements!.clear();
     }
+
     List<TextEditingInlineSpanReplacement> updatedReplacements = [];
 
     for (final TextEditingInlineSpanReplacement replacement
     in replacements!) {
+      // Syncing insertions.
       if (delta is TextEditingDeltaInsertion) {
-        //print('syncing insertion');
-        //print(delta.textInserted);
         if (delta.insertionOffset > replacement.range.start &&
-            delta.insertionOffset <= replacement.range.end) {
-          // Update range that falls inclusively inside the diff range.
-          //print('updating inclusive range on insertion');
+            delta.insertionOffset < replacement.range.end) {
+          // Update replacement where insertion offset is inclusively within replacement range.
           updatedReplacements.add(
             replacement.copy(
               range: TextRange(
                 start: replacement.range.start,
-                end: replacement.range.end + 1,
+                end: replacement.range.end + delta.textInserted.length,
               ),
             ),
           );
         } else if (delta.insertionOffset > replacement.range.end) {
-          //print('updating replacements that happened before insertion');
+          // Update replacements that happen before insertion offset.
           updatedReplacements.add(replacement);
         } else if (delta.insertionOffset < replacement.range.start) {
-          // Update ranges that falls after the diff range.
-          //print('updating replacements that happened after insertion');
-          //print('not sure about this case');
+          // Update replacements that happen after the insertion offset.
           updatedReplacements.add(
             replacement.copy(
               range: TextRange(
@@ -215,7 +227,7 @@ class ReplacementTextEditingController extends TextEditingController {
           );
         } else if (delta.insertionOffset == replacement.range.start || delta.insertionOffset == replacement.range.end) {
           if (delta.insertionOffset == replacement.range.start) {
-            // Inserting at the beginning of a replacement.
+            // Updating replacement where insertion offset touches front edge of replacement range.
             updatedReplacements.add(
               replacement.copy(
                 range: TextRange(
@@ -225,16 +237,15 @@ class ReplacementTextEditingController extends TextEditingController {
               ),
             );
           } else if (delta.insertionOffset == replacement.range.end) {
-            // Inserting at end of a replacement.
+            // Updating replacement where insertion offset touches back edge of replacement range.
             updatedReplacements.add(replacement);
           }
         }
       } else if (delta is TextEditingDeltaDeletion) {
-        //print('syncing deletion');
+        // Syncing deletions.
         if (delta.deletedRange.start >= replacement.range.start &&
             delta.deletedRange.end <= replacement.range.end) {
           // Update replacement ranges directly inclusively associated with deleted range.
-          //print('updating inclusive ranges of deletion');
           if (replacement.range.start !=
               replacement.range.end - delta.textDeleted.length) {
             updatedReplacements.add(
@@ -246,18 +257,14 @@ class ReplacementTextEditingController extends TextEditingController {
               ),
             );
           } else {
-            //print('start = end on deletion so remove attribute');
+            // Removing replacement.
           }
         } else if (delta.deletedRange.start > replacement.range.end &&
             delta.deletedRange.end > replacement.range.end) {
-          // If range happened before deletion, skip updating it.
-          //print(
-          //'updating replacement ranges that happened before the deletion.');
+          // Replacements that occurred before deletion range do not need updating.
           updatedReplacements.add(replacement);
         } else if (delta.deletedRange.end < replacement.range.start) {
-          // If deletion happened before range of current attribute, update it.
-          //print(
-          //'updating replacement ranges that happened after the deletion.');
+          // Updating replacements that occurred after the deleted range.
           updatedReplacements.add(
             replacement.copy(
               range: TextRange(
@@ -270,15 +277,11 @@ class ReplacementTextEditingController extends TextEditingController {
             delta.deletedRange.start == replacement.range.end ||
             delta.deletedRange.end == replacement.range.start ||
             delta.deletedRange.end == replacement.range.end) {
-          //print('updating ranges that are touching the deletion');
-
-          // If the replacement is a textspan, then merge the attributes and ranges into one.
-          // If they are of different type then, simply don't update them.
           if (delta.deletedRange.start == replacement.range.end || delta.deletedRange.end == replacement.range.end) {
-            // The deleted range is touching the end of the replacement.
+            // Updating replacement where the deleted range touches back edge of replacement range.
             updatedReplacements.add(replacement);
           } else if (delta.deletedRange.start == replacement.range.start || delta.deletedRange.end == replacement.range.start) {
-            // The deleted range is touching the beginning of the replacement.
+            // Updating replacement where the deleted range touches front edge of replacement range.
             updatedReplacements.add(
               replacement.copy(
                 range: TextRange(
@@ -290,40 +293,108 @@ class ReplacementTextEditingController extends TextEditingController {
           }
         }
       } else if (delta is TextEditingDeltaReplacement) {
-        if (delta.replacedRange.start > replacement.range.start &&
-            delta.replacedRange.end < replacement.range.end) {
-          // Update range that falls inclusively inside the diff range.
-          //print('updating inclusive range on replacement');
-          updatedReplacements.add(
-            replacement.copy(
-              range: TextRange(
-                start: replacement.range.start,
-                end: replacement.range.end + 1,
-              ),
-            ),
-          );
-        } else if (delta.replacedRange.end > replacement.range.end &&
-            delta.replacedRange.start > replacement.range.end) {
-          //print('updating replacements that happened before replacement');
+        final bool replacementShortenedText = delta.replacementText.length < delta.textReplaced.length;
+        final bool replacementLengthenedText = delta.replacementText.length > delta.textReplaced.length;
+        final bool replacementEqualLength = delta.replacementText.length == delta.textReplaced.length;
+        final int changedOffset = replacementShortenedText ? delta.textReplaced.length - delta.replacementText.length : delta.replacementText.length - delta.textReplaced.length;
+
+        // Syncing replacements.
+        if (delta.replacedRange.start >= replacement.range.start &&
+            delta.replacedRange.end <= replacement.range.end) {
+          // Update replacement ranges directly inclusively associated with replaced range.
+          final int replacementEndOffset = replacement.range.end;
+          final int replacementStartOffset = replacement.range.start;
+
+          if (replacementLengthenedText) {
+            updatedReplacements.add(
+                replacement.copy(range: TextRange(start: replacementStartOffset, end: delta.replacedRange.start))
+            );
+            updatedReplacements.add(replacement.copy(range: TextRange(start: delta.replacedRange.end + changedOffset, end: replacementEndOffset + changedOffset)));
+          }
+
+          if (replacementShortenedText) {
+            updatedReplacements.add(
+                replacement.copy(range: TextRange(start: replacementStartOffset, end: delta.replacedRange.start))
+            );
+            updatedReplacements.add(replacement.copy(range: TextRange(start: delta.replacedRange.end - changedOffset, end: replacementEndOffset - changedOffset)));
+          }
+
+          if (replacementEqualLength) {
+            updatedReplacements.add(
+                replacement.copy(range: TextRange(start: replacementStartOffset, end: delta.replacedRange.start))
+            );
+            updatedReplacements.add(replacement.copy(range: TextRange(start: delta.replacedRange.end, end: replacementEndOffset)));
+          }
+        } else if (delta.replacedRange.start > replacement.range.end &&
+            delta.replacedRange.end > replacement.range.end) {
+          // Replacements that occurred before replaced range do not need updating.
           updatedReplacements.add(replacement);
-          // print(replacement);
-        } else if (delta.replacedRange.start < replacement.range.start) {
-          // Update ranges that falls after the diff range.
-          //print('updating replacements that happened after replacement');
-          //print('not sure about this case');
-          final int replacedLength = delta.replacedRange.end - delta.replacedRange.start;
-          final int change = delta.replacementText.length - replacedLength;
-          updatedReplacements.add(
-            replacement.copy(
-              range: TextRange(
-                start: replacement.range.start + change,
-                end: replacement.range.end + change,
+        } else if (delta.replacedRange.end < replacement.range.start) {
+          // Updating replacements that occurred after the replaced range.
+          if (replacementLengthenedText) {
+            updatedReplacements.add(
+              replacement.copy(
+                range: TextRange(
+                  start: replacement.range.start + changedOffset,
+                  end: replacement.range.end + changedOffset,
+                ),
               ),
-            ),
-          );
+            );
+          }
+
+          if (replacementShortenedText) {
+            updatedReplacements.add(
+              replacement.copy(
+                range: TextRange(
+                  start: replacement.range.start - changedOffset,
+                  end: replacement.range.end - changedOffset,
+                ),
+              ),
+            );
+          }
+
+          if (replacementEqualLength) {
+            updatedReplacements.add(replacement);
+          }
+        } else if (delta.replacedRange.start == replacement.range.start ||
+            delta.replacedRange.start == replacement.range.end ||
+            delta.replacedRange.end == replacement.range.start ||
+            delta.replacedRange.end == replacement.range.end) {
+          if (delta.replacedRange.start == replacement.range.end || delta.replacedRange.end == replacement.range.end) {
+            // Updating replacement where the replaced range touches back edge of replacement range.
+            updatedReplacements.add(replacement);
+          } else if (delta.replacedRange.start == replacement.range.start || delta.replacedRange.end == replacement.range.start) {
+            // Updating replacement where the replaced range touches front edge of replacement range.
+            if (replacementLengthenedText) {
+              updatedReplacements.add(
+                replacement.copy(
+                  range: TextRange(
+                    start: replacement.range.start + changedOffset,
+                    end: replacement.range.end + changedOffset,
+                  ),
+                ),
+              );
+            }
+
+            if (replacementShortenedText) {
+              updatedReplacements.add(
+                replacement.copy(
+                  range: TextRange(
+                    start: replacement.range.start - changedOffset,
+                    end: replacement.range.end - changedOffset,
+                  ),
+                ),
+              );
+            }
+
+            if (replacementEqualLength) {
+              updatedReplacements.add(replacement);
+            }
+          }
         }
       } else if (delta is TextEditingDeltaNonTextUpdate) {
-        //print('sync non text update');
+        // Sync non text updates.
+        // Nothing to do here.
       }
     }
 
@@ -342,9 +413,6 @@ class ReplacementTextEditingController extends TextEditingController {
     assert(!value.composing.isValid ||
         !withComposing ||
         value.isComposingRangeValid);
-
-    //print('beginning buildTextSpan');
-    //print(replacements!.length);
 
     // Keep a mapping of TextRanges to the InlineSpan to replace it with.
     final Map<TextRange, InlineSpan> rangeSpanMapping =
@@ -371,7 +439,6 @@ class ReplacementTextEditingController extends TextEditingController {
     // Iterate through TextEditingInlineSpanReplacements, handling overlapping
     // replacements and mapping them towards a generated InlineSpan.
     if (replacements != null) {
-      //print('replacements not null');
       for (final TextEditingInlineSpanReplacement replacement
       in replacements!) {
         _addToMappingWithOverlaps(
@@ -381,9 +448,8 @@ class ReplacementTextEditingController extends TextEditingController {
             rangeSpanMapping,
             value.text);
       }
-    } else {
-      //print('replacements is null');
     }
+
     // If the composing range is out of range for the current text, ignore it to
     // preserve the tree integrity, otherwise in release mode a RangeError will
     // be thrown and this EditableText will be built with a broken subtree.
@@ -448,7 +514,6 @@ class ReplacementTextEditingController extends TextEditingController {
     }
 
     if (overlap) {
-      //print('there is an overlap');
       InlineSpan? generatedReplacement =
       generator(matchedRange.textInside(text), matchedRange);
       InlineSpan? previousGeneratedReplacement = rangeSpanMapping[matchedRange];
@@ -462,8 +527,6 @@ class ReplacementTextEditingController extends TextEditingController {
         TextStyle? genRepStyle = generatedReplacementTextSpan.style;
         TextStyle? prevRepStyle = previousGeneratedReplacementTextSpan.style;
         String? text = generatedReplacementTextSpan.text;
-
-        //print('the overlap is of textspans...attempting to merge the styles');
 
         if (text != null && genRepStyle != null && prevRepStyle != null) {
           final TextStyle mergedReplacementStyle =

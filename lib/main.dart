@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: const MyHomePage(title: 'Flutter Delta Text Field Home Page'),
+      home: const MyHomePage(title: 'Flutter Delta Text Field Demo'),
     );
   }
 }
@@ -32,7 +32,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final TextEditingController _controller = TextEditingController();
   final ReplacementTextEditingController _replacementTextEditingController =
   ReplacementTextEditingController(
     text: 'The quick brown fox jumps over the lazy \uffff dog.',
@@ -74,7 +73,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     );
                     setState(() {});
                     },
-                  child: const Text('BOLD'),
+                  child: const Icon(Icons.format_bold),
                 ),
                 OutlinedButton(
                   onPressed: (){
@@ -89,7 +88,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     );
                     setState(() {});
                   },
-                  child: const Text('ITALICS'),
+                  child: const Icon(Icons.format_italic),
                 ),
                 OutlinedButton(
                   onPressed: (){
@@ -104,7 +103,7 @@ class _MyHomePageState extends State<MyHomePage> {
                     );
                     setState(() {});
                   },
-                  child: const Text('UNDERLINE'),
+                  child: const Icon(Icons.format_underline),
                 ),
               ],
             ),
