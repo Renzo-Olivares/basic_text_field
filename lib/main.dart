@@ -47,6 +47,7 @@ class _MyHomePageState extends State<MyHomePage> {
     ],
   );
   final FocusNode _focusNode = FocusNode();
+  final List<bool> isSelected = [false];
 
   @override
   Widget build(BuildContext context) {

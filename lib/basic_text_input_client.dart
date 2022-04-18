@@ -65,7 +65,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   }
 
   @override
-  // TODO: implement currentAutofillScope
   // Will not implement.
   AutofillScope? get currentAutofillScope => throw UnimplementedError();
 
@@ -74,27 +73,27 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   void insertTextPlaceholder(Size size) {
-    // TODO: implement insertTextPlaceholder
+    // Will not implement. This method is used for Scribble support.
   }
 
   @override
   void performAction(TextInputAction action) {
-    // TODO: implement performAction
+    // Will not implement.
   }
 
   @override
   void performPrivateCommand(String action, Map<String, dynamic> data) {
-    // TODO: implement performPrivateCommand
+    // Will not implement.
   }
 
   @override
   void removeTextPlaceholder() {
-    // TODO: implement removeTextPlaceholder
+    // Will not implement. This method is used for Scribble support.
   }
 
   @override
   void showAutocorrectionPromptRect(int start, int end) {
-    // TODO: implement showAutocorrectionPromptRect
+    // Will not implement.
   }
 
   @override
@@ -143,7 +142,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   void updateFloatingCursor(RawFloatingCursorPoint point) {
-    // TODO: implement updateFloatingCursor
+    // Will not implement.
   }
 
   /// Open/close [DeltaTextInputClient]
@@ -257,7 +256,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   }
 
   /// Keyboard text editing actions.
-  // TODO(justinmc): Handling of the default text editing shortcuts with deltas
+  // The Handling of the default text editing shortcuts with deltas
   // needs to be in the framework somehow.  This should go through some kind of
   // generic "replace" method like in EditableText.
   // EditableText converts intents like DeleteCharacterIntent to a generic
@@ -380,7 +379,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   /// [TextSelectionDelegate] method implementations.
   @override
   void bringIntoView(TextPosition position) {
-    // TODO: implement bringIntoView
+    // Not implemented.
   }
 
   @override
@@ -513,7 +512,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
     if (cause == SelectionChangedCause.drag || cause == SelectionChangedCause.longPress) {
       // Here the change is coming from gestures which call on RenderEditable to change the selection.
-      // TODO: Should we create a delta and apply it here instead of just setting the value?
     }
 
     _value = value;
@@ -535,8 +533,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     // We return early if the selection is not valid. This can happen when the
     // text of [EditableText] is updated at the same time as the selection is
     // changed by a gesture event.
-    if (!widget.controller.isSelectionWithinTextBounds(selection))
+    if (!widget.controller.isSelectionWithinTextBounds(selection)) {
       return;
+    }
 
     widget.controller.selection = selection;
 
@@ -618,7 +617,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
                 inlineSpan: _buildTextSpan(),
                 value: _value, // We pass value.selection to RenderEditable.
                 cursorColor: Colors.blue,
-                backgroundCursorColor: Colors.grey[100], // TODO: document.
+                backgroundCursorColor: Colors.grey[100],
                 showCursor: ValueNotifier<bool>(true),
                 forceLine: true, // Whether text field will take full line regardless of width.
                 readOnly: false, // editable text-field.
@@ -626,30 +625,30 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
                 maxLines: null, // multi-line text-field.
                 minLines: null,
                 expands: false, // expands to height of parent.
-                strutStyle: null, // TODO: document.
+                strutStyle: null,
                 selectionColor: Colors.blue.withOpacity(0.40),
-                textScaleFactor: MediaQuery.textScaleFactorOf(context), // TODO: document.
-                textAlign: TextAlign.left, // TODO: make variable.
+                textScaleFactor: MediaQuery.textScaleFactorOf(context),
+                textAlign: TextAlign.left,
                 textDirection: _textDirection,
-                locale: Localizations.maybeLocaleOf(context), // TODO: document.
-                textHeightBehavior: DefaultTextHeightBehavior.of(context), // TODO: make variable.
-                textWidthBasis: TextWidthBasis.parent, // TODO: document.
+                locale: Localizations.maybeLocaleOf(context),
+                textHeightBehavior: DefaultTextHeightBehavior.of(context),
+                textWidthBasis: TextWidthBasis.parent,
                 obscuringCharacter: '•',
                 obscureText: false, // This is a non-private text field that does not require obfuscation.
                 offset: position,
-                onCaretChanged: null, // TODO: implement.
-                rendererIgnoresPointer: true, // TODO: document.
+                onCaretChanged: null,
+                rendererIgnoresPointer: true,
                 cursorWidth: 2.0,
                 cursorHeight: null,
                 cursorRadius: const Radius.circular(2.0),
                 cursorOffset: Offset.zero,
-                paintCursorAboveText: false, // TODO: document.
+                paintCursorAboveText: false,
                 enableInteractiveSelection: true, // make true to enable selection on mobile.
                 textSelectionDelegate: this,
-                devicePixelRatio: MediaQuery.of(context).devicePixelRatio, // TODO: document.
-                promptRectRange: null, // TODO: document.
-                promptRectColor: null, // TODO: document.
-                clipBehavior: Clip.hardEdge, // TODO: document.
+                devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
+                promptRectRange: null,
+                promptRectColor: null,
+                clipBehavior: Clip.hardEdge,
               ),
             );
           },

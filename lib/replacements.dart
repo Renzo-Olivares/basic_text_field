@@ -78,7 +78,7 @@ class TextEditingInlineSpanReplacement {
   /// Creates a new replacement with all properties copied except for range, which
   /// is updated to the specified value.
   TextEditingInlineSpanReplacement copy({required TextRange range}) {
-    return TextEditingInlineSpanReplacement(range, this.generator);
+    return TextEditingInlineSpanReplacement(range, generator);
   }
 
   @override
@@ -115,9 +115,6 @@ class ReplacementTextEditingController extends TextEditingController {
   ///
   /// Each replacement is evaluated in order from first to last. If multiple replacement
   /// [TextRange]s match against the same range of text,
-  /// TODO: What happens when replacements match against same range of text?
-  ///
-  /// TODO: Give an example of replacements matching against the same range of text.
   List<TextEditingInlineSpanReplacement>? replacements;
 
   /// If composing regions should be matched against for replacements.
@@ -258,6 +255,7 @@ class ReplacementTextEditingController extends TextEditingController {
             );
           } else {
             // Removing replacement.
+            replacements!.remove(replacement);
           }
         } else if (delta.deletedRange.start > replacement.range.end &&
             delta.deletedRange.end > replacement.range.end) {
@@ -521,9 +519,9 @@ class ReplacementTextEditingController extends TextEditingController {
       if (previousGeneratedReplacement is TextSpan &&
           generatedReplacement is TextSpan) {
         TextSpan? generatedReplacementTextSpan =
-        (generatedReplacement as TextSpan);
+        generatedReplacement;
         TextSpan? previousGeneratedReplacementTextSpan =
-        (previousGeneratedReplacement as TextSpan);
+        previousGeneratedReplacement;
         TextStyle? genRepStyle = generatedReplacementTextSpan.style;
         TextStyle? prevRepStyle = previousGeneratedReplacementTextSpan.style;
         String? text = generatedReplacementTextSpan.text;

@@ -158,14 +158,17 @@ class _BasicTextFieldState extends State<BasicTextField> {
   bool _shouldShowSelectionHandles(SelectionChangedCause? cause) {
     // When the text field is activated by something that doesn't trigger the
     // selection overlay, we shouldn't show the handles either.
-    if (cause == SelectionChangedCause.keyboard)
+    if (cause == SelectionChangedCause.keyboard) {
       return false;
+    }
 
-    if (cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.scribble)
+    if (cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.scribble) {
       return true;
+    }
 
-    if (widget.controller.text.isNotEmpty)
+    if (widget.controller.text.isNotEmpty) {
       return true;
+    }
 
     return false;
   }
@@ -801,8 +804,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     // We return early if the selection is not valid. This can happen when the
     // text of [EditableText] is updated at the same time as the selection is
     // changed by a gesture event.
-    if (!widget.controller.isSelectionWithinTextBounds(selection))
+    if (!widget.controller.isSelectionWithinTextBounds(selection)) {
       return;
+    }
 
     widget.controller.selection = selection;
 
@@ -1180,7 +1184,7 @@ class TextEditingInlineSpanReplacement {
   /// Creates a new replacement with all properties copied except for range, which
   /// is updated to the specified value.
   TextEditingInlineSpanReplacement copy({required TextRange range}) {
-    return TextEditingInlineSpanReplacement(range, this.generator);
+    return TextEditingInlineSpanReplacement(range, generator);
   }
 
   @override
@@ -1623,9 +1627,9 @@ class ReplacementTextEditingController extends TextEditingController {
       if (previousGeneratedReplacement is TextSpan &&
           generatedReplacement is TextSpan) {
         TextSpan? generatedReplacementTextSpan =
-        (generatedReplacement as TextSpan);
+        generatedReplacement;
         TextSpan? previousGeneratedReplacementTextSpan =
-        (previousGeneratedReplacement as TextSpan);
+        previousGeneratedReplacement;
         TextStyle? genRepStyle = generatedReplacementTextSpan.style;
         TextStyle? prevRepStyle = previousGeneratedReplacementTextSpan.style;
         String? text = generatedReplacementTextSpan.text;

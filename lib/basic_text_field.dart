@@ -39,14 +39,17 @@ class _BasicTextFieldState extends State<BasicTextField> {
   bool _shouldShowSelectionHandles(SelectionChangedCause? cause) {
     // When the text field is activated by something that doesn't trigger the
     // selection overlay, we shouldn't show the handles either.
-    if (cause == SelectionChangedCause.keyboard)
+    if (cause == SelectionChangedCause.keyboard) {
       return false;
+    }
 
-    if (cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.scribble)
+    if (cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.scribble) {
       return true;
+    }
 
-    if (widget.controller.text.isNotEmpty)
+    if (widget.controller.text.isNotEmpty) {
       return true;
+    }
 
     return false;
   }
