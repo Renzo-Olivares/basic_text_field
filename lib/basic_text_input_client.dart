@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:deltaclientguide/basic_text_field.dart';
 import 'package:deltaclientguide/replacements.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -22,6 +23,7 @@ class BasicTextInputClient extends StatefulWidget {
     this.selectionControls,
     required this.onSelectionChanged,
     required this.showSelectionHandles,
+    this.updateTextEditingDeltaHistory,
   }) : super(key: key);
 
   final TextEditingController controller;
@@ -30,12 +32,14 @@ class BasicTextInputClient extends StatefulWidget {
   final TextSelectionControls? selectionControls;
   final bool showSelectionHandles;
   final SelectionChangedCallback onSelectionChanged;
+  final TextEditingDeltaHistoryUpdateCallback? updateTextEditingDeltaHistory;
 
   @override
   State<BasicTextInputClient> createState() => BasicTextInputClientState();
 }
 
-class BasicTextInputClientState extends State<BasicTextInputClient> with TextSelectionDelegate implements DeltaTextInputClient {
+class BasicTextInputClientState extends State<BasicTextInputClient>
+    with TextSelectionDelegate implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
   final ClipboardStatusNotifier? _clipboardStatus = kIsWeb ? null : ClipboardStatusNotifier();
 
@@ -99,15 +103,14 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   @override
   bool showToolbar() {
     // On the web use provided native dom elements to provide clipboard functionality.
-    if (kIsWeb) {
-      return false;
-    }
+    if (kIsWeb) return false;
 
     if (_selectionOverlay == null || _selectionOverlay!.toolbarIsVisible) {
       return false;
     }
 
     _selectionOverlay!.showToolbar();
+
     return true;
   }
 
@@ -130,6 +133,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       // Track at https://github.com/flutter/flutter/issues/65811
       return;
     }
+
+    widget.updateTextEditingDeltaHistory?.call(textEditingDeltas);
 
     _value = value;
 
@@ -252,6 +257,10 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       (widget.controller as ReplacementTextEditingController).syncReplacementRanges(textEditingDelta);
     }
 
+    if (value != _value) {
+      widget.updateTextEditingDeltaHistory?.call([textEditingDelta]);
+    }
+
     userUpdateTextEditingValue(value, cause);
   }
 
@@ -273,16 +282,14 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   };
 
   void _delete() {
-    if (_value.text.isEmpty) {
-      return;
-    }
+    if (_value.text.isEmpty) return;
 
     late final TextRange deletedRange;
+    late final TextRange newComposing;
+    final int deletedLength = _value.text.substring(0, _selection.baseOffset).characters.last.length;
+
     if (_selection.isCollapsed) {
-      if (_selection.baseOffset == 0) {
-        return;
-      }
-      final int deletedLength = _value.text.substring(0, _selection.baseOffset).characters.last.length;
+      if (_selection.baseOffset == 0) return;
       deletedRange = TextRange(
         start: _selection.baseOffset - deletedLength,
         end: _selection.baseOffset,
@@ -291,11 +298,19 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       deletedRange = _selection;
     }
 
+    final bool isComposing = _selection.isCollapsed && _value.isComposingRangeValid;
+
+    if (isComposing) {
+      newComposing = TextRange.collapsed(deletedRange.start);
+    } else {
+      newComposing = TextRange.empty;
+    }
+
     _userUpdateTextEditingValueWithDelta(
       TextEditingDeltaDeletion(
         oldText: _value.text,
         selection: TextSelection.collapsed(offset: deletedRange.start),
-        composing: TextRange.collapsed(deletedRange.start),
+        composing: newComposing,
         deletedRange: deletedRange,
       ),
       SelectionChangedCause.keyboard,
@@ -309,12 +324,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       final int lastOffset = _selection.isNormalized ? _selection.end : _selection.start;
       selection = TextSelection.collapsed(offset: forward ? lastOffset : firstOffset);
     } else {
-      if (forward && _selection.baseOffset == _value.text.length) {
-        return;
-      }
-      if (!forward && _selection.baseOffset == 0) {
-        return;
-      }
+      if (forward && _selection.baseOffset == _value.text.length) return;
+      if (!forward && _selection.baseOffset == 0) return;
       final int adjustment = forward
           ? _value.text.substring(_selection.baseOffset).characters.first.length
           : -_value.text.substring(0, _selection.baseOffset).characters.last.length;
@@ -366,9 +377,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   // Only update the platform's text input plugin's text editing value when it has changed
   // to avoid sending duplicate update messages to the engine.
   void _updateRemoteTextEditingValueIfNeeded() {
-    if (_lastKnownRemoteTextEditingValue == _value) {
-      return;
-    }
+    if (_lastKnownRemoteTextEditingValue == _value) return;
 
     if (_textInputConnection != null) {
       _textInputConnection!.setEditingState(_value);
@@ -385,9 +394,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   @override
   void copySelection(SelectionChangedCause cause) {
     final TextSelection copyRange = textEditingValue.selection;
-    if (!copyRange.isValid || copyRange.isCollapsed) {
-      return;
-    }
+    if (!copyRange.isValid || copyRange.isCollapsed) return;
     final String text = textEditingValue.text;
     Clipboard.setData(ClipboardData(text: copyRange.textInside(text)));
 
@@ -422,9 +429,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     final TextSelection cutRange = textEditingValue.selection;
     final String text = textEditingValue.text;
 
-    if (cutRange.isCollapsed) {
-      return;
-    }
+    if (cutRange.isCollapsed) return;
     Clipboard.setData(ClipboardData(text: cutRange.textInside(text)));
     final int lastSelectionIndex = math.min(cutRange.baseOffset, cutRange.extentOffset);
     _userUpdateTextEditingValueWithDelta(
@@ -437,9 +442,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       ),
       cause,
     );
-    if (cause == SelectionChangedCause.toolbar) {
-      hideToolbar();
-    }
+    if (cause == SelectionChangedCause.toolbar) hideToolbar();
     _clipboardStatus?.update();
   }
 
@@ -457,14 +460,10 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   @override
   Future<void> pasteText(SelectionChangedCause cause) async {
     final TextSelection pasteRange = textEditingValue.selection;
-    if (!pasteRange.isValid) {
-      return;
-    }
+    if (!pasteRange.isValid) return;
 
     final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (data == null) {
-      return;
-    }
+    if (data == null) return;
 
     // After the paste, the cursor should be collapsed and located after the
     // pasted content.
@@ -481,9 +480,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       cause,
     );
 
-    if (cause == SelectionChangedCause.toolbar) {
-      hideToolbar();
-    }
+    if (cause == SelectionChangedCause.toolbar) hideToolbar();
   }
 
   @override
@@ -504,21 +501,28 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   void userUpdateTextEditingValue(TextEditingValue value, SelectionChangedCause cause) {
-    if (value == _value) {
-      return;
-    }
+    if (value == _value) return;
 
     final bool selectionChanged = _value.selection != value.selection;
 
-    if (cause == SelectionChangedCause.drag || cause == SelectionChangedCause.longPress) {
+    if (cause == SelectionChangedCause.drag || cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.tap) {
       // Here the change is coming from gestures which call on RenderEditable to change the selection.
+      // Create a TextEditingDeltaNonTextUpdate so we can keep track of the delta history. RenderEditable
+      // does not report a delta on selection change.
+      final bool textChanged = _value.text != value.text;
+      if (selectionChanged && !textChanged) {
+        final TextEditingDeltaNonTextUpdate selectionUpdate = TextEditingDeltaNonTextUpdate(
+            oldText: value.text,
+            selection: value.selection,
+            composing: value.composing,
+        );
+        widget.updateTextEditingDeltaHistory?.call([selectionUpdate]);
+      }
     }
 
     _value = value;
 
-    if (selectionChanged) {
-      _handleSelectionChanged(_value.selection, cause);
-    }
+    if (selectionChanged) _handleSelectionChanged(_value.selection, cause);
   }
 
   /// For TextSelection.
@@ -533,9 +537,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     // We return early if the selection is not valid. This can happen when the
     // text of [EditableText] is updated at the same time as the selection is
     // changed by a gesture event.
-    if (!widget.controller.isSelectionWithinTextBounds(selection)) {
-      return;
-    }
+    if (!widget.controller.isSelectionWithinTextBounds(selection)) return;
 
     widget.controller.selection = selection;
 
@@ -602,56 +604,61 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   Widget build(BuildContext context) {
-    return Actions(
-      actions: _actions,
-      child: Focus(
-        focusNode: widget.focusNode,
-        child: Scrollable(
-          viewportBuilder: (BuildContext context, ViewportOffset position) {
-            return CompositedTransformTarget(
-              link: _toolbarLayerLink,
-              child: _Editable(
-                key: _textKey,
-                startHandleLayerLink: _startHandleLayerLink,
-                endHandleLayerLink: _endHandleLayerLink,
-                inlineSpan: _buildTextSpan(),
-                value: _value, // We pass value.selection to RenderEditable.
-                cursorColor: Colors.blue,
-                backgroundCursorColor: Colors.grey[100],
-                showCursor: ValueNotifier<bool>(true),
-                forceLine: true, // Whether text field will take full line regardless of width.
-                readOnly: false, // editable text-field.
-                hasFocus: _hasFocus,
-                maxLines: null, // multi-line text-field.
-                minLines: null,
-                expands: false, // expands to height of parent.
-                strutStyle: null,
-                selectionColor: Colors.blue.withOpacity(0.40),
-                textScaleFactor: MediaQuery.textScaleFactorOf(context),
-                textAlign: TextAlign.left,
-                textDirection: _textDirection,
-                locale: Localizations.maybeLocaleOf(context),
-                textHeightBehavior: DefaultTextHeightBehavior.of(context),
-                textWidthBasis: TextWidthBasis.parent,
-                obscuringCharacter: '•',
-                obscureText: false, // This is a non-private text field that does not require obfuscation.
-                offset: position,
-                onCaretChanged: null,
-                rendererIgnoresPointer: true,
-                cursorWidth: 2.0,
-                cursorHeight: null,
-                cursorRadius: const Radius.circular(2.0),
-                cursorOffset: Offset.zero,
-                paintCursorAboveText: false,
-                enableInteractiveSelection: true, // make true to enable selection on mobile.
-                textSelectionDelegate: this,
-                devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
-                promptRectRange: null,
-                promptRectColor: null,
-                clipBehavior: Clip.hardEdge,
-              ),
-            );
-          },
+    return Shortcuts(
+      shortcuts: <ShortcutActivator, Intent>{
+        if (kIsWeb) const SingleActivator(LogicalKeyboardKey.space) : DoNothingAndStopPropagationIntent(),
+      },
+      child: Actions(
+        actions: _actions,
+        child: Focus(
+          focusNode: widget.focusNode,
+          child: Scrollable(
+            viewportBuilder: (BuildContext context, ViewportOffset position) {
+              return CompositedTransformTarget(
+                link: _toolbarLayerLink,
+                child: _Editable(
+                  key: _textKey,
+                  startHandleLayerLink: _startHandleLayerLink,
+                  endHandleLayerLink: _endHandleLayerLink,
+                  inlineSpan: _buildTextSpan(),
+                  value: _value, // We pass value.selection to RenderEditable.
+                  cursorColor: Colors.blue,
+                  backgroundCursorColor: Colors.grey[100],
+                  showCursor: ValueNotifier<bool>(true),
+                  forceLine: true, // Whether text field will take full line regardless of width.
+                  readOnly: false, // editable text-field.
+                  hasFocus: _hasFocus,
+                  maxLines: null, // multi-line text-field.
+                  minLines: null,
+                  expands: false, // expands to height of parent.
+                  strutStyle: null,
+                  selectionColor: Colors.blue.withOpacity(0.40),
+                  textScaleFactor: MediaQuery.textScaleFactorOf(context),
+                  textAlign: TextAlign.left,
+                  textDirection: _textDirection,
+                  locale: Localizations.maybeLocaleOf(context),
+                  textHeightBehavior: DefaultTextHeightBehavior.of(context),
+                  textWidthBasis: TextWidthBasis.parent,
+                  obscuringCharacter: '•',
+                  obscureText: false, // This is a non-private text field that does not require obfuscation.
+                  offset: position,
+                  onCaretChanged: null,
+                  rendererIgnoresPointer: true,
+                  cursorWidth: 2.0,
+                  cursorHeight: null,
+                  cursorRadius: const Radius.circular(2.0),
+                  cursorOffset: Offset.zero,
+                  paintCursorAboveText: false,
+                  enableInteractiveSelection: true, // make true to enable selection on mobile.
+                  textSelectionDelegate: this,
+                  devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
+                  promptRectRange: null,
+                  promptRectColor: null,
+                  clipBehavior: Clip.hardEdge,
+                ),
+              );
+            },
+          ),
         ),
       ),
     );

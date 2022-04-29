@@ -1,8 +1,12 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart' show TextEditingDelta;
 
 import 'basic_text_input_client.dart';
+
+typedef AnySelectionChangedCallback = void Function(TextSelection selection);
+typedef TextEditingDeltaHistoryUpdateCallback = void Function(List<TextEditingDelta> textEditingDeltas);
 
 /// A basic text field. Defines the appearance of a basic text input client.
 class BasicTextField extends StatefulWidget {
@@ -10,16 +14,19 @@ class BasicTextField extends StatefulWidget {
     Key? key,
     required this.controller,
     required this.style,
-    required this.focusNode
+    required this.focusNode,
+    this.updateToggleButtonStateOnSelectionChanged,
+    this.updateTextEditingDeltaHistory,
   }) : super(key: key);
 
   final TextEditingController controller;
   final TextStyle style;
   final FocusNode focusNode;
+  final AnySelectionChangedCallback? updateToggleButtonStateOnSelectionChanged;
+  final TextEditingDeltaHistoryUpdateCallback? updateTextEditingDeltaHistory;
 
   @override
   State<BasicTextField> createState() => _BasicTextFieldState();
-
 }
 
 class _BasicTextFieldState extends State<BasicTextField> {
@@ -43,7 +50,8 @@ class _BasicTextFieldState extends State<BasicTextField> {
       return false;
     }
 
-    if (cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.scribble) {
+    if (cause == SelectionChangedCause.longPress
+        || cause == SelectionChangedCause.scribble) {
       return true;
     }
 
@@ -61,6 +69,27 @@ class _BasicTextFieldState extends State<BasicTextField> {
         _showSelectionHandles = willShowSelectionHandles;
       });
     }
+
+    if (cause != null) {
+      widget.updateToggleButtonStateOnSelectionChanged?.call(selection);
+    }
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    final Offset startOffset = _renderEditable.maxLines == 1
+        ? Offset(_renderEditable.offset.pixels - _dragStartViewportOffset, 0.0)
+        : Offset(0.0, _renderEditable.offset.pixels - _dragStartViewportOffset);
+
+    _renderEditable.selectPositionAt(
+      from: _startDetails.globalPosition - startOffset,
+      to: details.globalPosition,
+      cause: SelectionChangedCause.drag,
+    );
+  }
+
+  void _onDragStart(DragStartDetails details) {
+    _startDetails = details;
+    _dragStartViewportOffset = _renderEditable.offset.pixels;
   }
 
   @override
@@ -88,21 +117,8 @@ class _BasicTextFieldState extends State<BasicTextField> {
       focusNode: widget.focusNode,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onPanStart: (DragStartDetails details) {
-          _startDetails = details;
-          _dragStartViewportOffset = _renderEditable.offset.pixels;
-        },
-        onPanUpdate: (DragUpdateDetails details) {
-          final Offset startOffset = _renderEditable.maxLines == 1
-              ? Offset(_renderEditable.offset.pixels - _dragStartViewportOffset, 0.0)
-              : Offset(0.0, _renderEditable.offset.pixels - _dragStartViewportOffset);
-
-          _renderEditable.selectPositionAt(
-            from: _startDetails.globalPosition - startOffset,
-            to: details.globalPosition,
-            cause: SelectionChangedCause.drag,
-          );
-        },
+        onPanStart: (DragStartDetails details) => _onDragStart(details),
+        onPanUpdate: (DragUpdateDetails details) => _onDragUpdate(details),
         onTap: () {
           _textInputClient!.requestKeyboard();
         },
@@ -131,24 +147,27 @@ class _BasicTextFieldState extends State<BasicTextField> {
               break;
           }
         },
-        onLongPressEnd: (LongPressEndDetails details) {
-          _textInputClient!.showToolbar();
-        },
-        child: Container(
-          height: 300,
-          width: 300,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.blue),
-            borderRadius: const BorderRadius.all(Radius.circular(4.0)),
-          ),
-          child: BasicTextInputClient(
-            key: textInputClientKey,
-            controller: widget.controller,
-            style: widget.style,
-            focusNode: widget.focusNode,
-            selectionControls: _textSelectionControls,
-            onSelectionChanged: _handleSelectionChanged,
-            showSelectionHandles: _showSelectionHandles,
+        onLongPressEnd: (LongPressEndDetails details) => _textInputClient!.showToolbar(),
+        onHorizontalDragStart: (DragStartDetails details) => _onDragStart(details),
+        onHorizontalDragUpdate: (DragUpdateDetails details) => _onDragUpdate(details),
+        child: SizedBox(
+          height: double.infinity,
+          width: MediaQuery.of(context).size.width,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.black),
+              borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+            ),
+            child: BasicTextInputClient(
+              key: textInputClientKey,
+              controller: widget.controller,
+              style: widget.style,
+              focusNode: widget.focusNode,
+              selectionControls: _textSelectionControls,
+              onSelectionChanged: _handleSelectionChanged,
+              showSelectionHandles: _showSelectionHandles,
+              updateTextEditingDeltaHistory: widget.updateTextEditingDeltaHistory,
+            ),
           ),
         ),
       ),
