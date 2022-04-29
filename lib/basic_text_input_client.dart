@@ -504,6 +504,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     if (value == _value) return;
 
     final bool selectionChanged = _value.selection != value.selection;
+    print(_value.selection);
+    print(value.selection);
 
     if (cause == SelectionChangedCause.drag || cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.tap) {
       // Here the change is coming from gestures which call on RenderEditable to change the selection.
