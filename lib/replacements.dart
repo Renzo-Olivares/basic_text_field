@@ -167,19 +167,15 @@ class ReplacementTextEditingController extends TextEditingController {
 
     if (text.isEmpty) replacements!.clear();
 
-    print(replacements!.length);
-
     List<TextEditingInlineSpanReplacement> updatedReplacements = [];
     List<TextEditingInlineSpanReplacement> toRemove = [];
 
     for (final TextEditingInlineSpanReplacement replacement
     in replacements!) {
-      print('syncing replacements currently at $replacement');
       // Syncing insertions.
       if (delta is TextEditingDeltaInsertion) {
         if (delta.insertionOffset == replacement.range.end
             && delta.insertionOffset == replacement.range.start) {
-          print('replacement collapsed');
           if (replacement.expand) {
             updatedReplacements.add(
               replacement.copy(
@@ -218,7 +214,6 @@ class ReplacementTextEditingController extends TextEditingController {
             || delta.insertionOffset == replacement.range.end) {
           if (delta.insertionOffset == replacement.range.start) {
             // Updating replacement where insertion offset touches front edge of replacement range.
-            print('insertion front edge');
             updatedReplacements.add(
               replacement.copy(
                 range: TextRange(
@@ -229,7 +224,6 @@ class ReplacementTextEditingController extends TextEditingController {
             );
           } else if (delta.insertionOffset == replacement.range.end) {
             // Updating replacement where insertion offset touches back edge of replacement range.
-            print('insertion back edge');
             if (replacement.expand) {
               updatedReplacements.add(
                 replacement.copy(
@@ -261,8 +255,6 @@ class ReplacementTextEditingController extends TextEditingController {
             );
           } else {
             // Removing replacement.
-            // replacements!.remove(replacement);
-            print('remove $replacement');
             toRemove.add(replacement);
           }
         } else if (delta.deletedRange.start > replacement.range.end
@@ -286,9 +278,7 @@ class ReplacementTextEditingController extends TextEditingController {
           if (delta.deletedRange.start == replacement.range.end
               || delta.deletedRange.end == replacement.range.end) {
             // Updating replacement where the deleted range touches back edge of replacement range
-            print('back edge hit at delta deleted range ${delta.deletedRange} and replacement range ${replacement.range}');
             if (delta.deletedRange.start == replacement.range.end) {
-              print('interestingggggg');
               updatedReplacements.add(replacement);
             }
 
@@ -309,7 +299,6 @@ class ReplacementTextEditingController extends TextEditingController {
                   );
                 }
               } else {
-                print('not expanded $replacement');
                 if (replacement.range.start == replacement.range.end) {
                   toRemove.add(replacement);
                 } else {
@@ -524,10 +513,7 @@ class ReplacementTextEditingController extends TextEditingController {
     // Iterate through TextEditingInlineSpanReplacements, handling overlapping
     // replacements and mapping them towards a generated InlineSpan.
     if (replacements != null) {
-      print('----------------------------------------------------------------------');
-      print('iterating through replacements to handle overlapping replacements');
       for (final TextEditingInlineSpanReplacement replacement in replacements!) {
-        print('checking $replacement overlaps ${replacement.generator(value.text, replacement.range).style!}');
         _addToMappingWithOverlaps(
             replacement.generator,
             TextRange(start: replacement.range.start, end: replacement.range.end),
@@ -535,8 +521,6 @@ class ReplacementTextEditingController extends TextEditingController {
             value.text,
         );
       }
-      print('end of replacement overlaps check');
-      print('----------------------------------------------------------------------');
     }
 
     // If the composing range is out of range for the current text, ignore it to
@@ -594,19 +578,14 @@ class ReplacementTextEditingController extends TextEditingController {
     // we should try to merge the styles into one TextStyle and build a new TextSpan.
     bool overlap = false;
     List<TextRange> overlapRanges = <TextRange>[];
-    print('add to mapping with overlaps');
     for (final TextRange range in rangeSpanMapping.keys) {
-      print('comparing against range $range');
       if (math.max(matchedRange.start, range.start)
           <= math.min(matchedRange.end, range.end)) {
-        print('overlap found $matchedRange and $range');
-        print('overlap found $range ${rangeSpanMapping[range]!.style!}');
         overlap = true;
         overlapRanges.add(range);
       }
     }
 
-    print('number of overlapping ranges' + overlapRanges.length.toString());
     final List<List<dynamic>> overlappingTriples = <List<dynamic>>[];
 
     if (overlap) {
@@ -621,11 +600,9 @@ class ReplacementTextEditingController extends TextEditingController {
       final List<dynamic> toAddRangesThatHaveBeenMerged = [];
       for (int i = 0; i < overlappingTriples.length; i++) {
         List<dynamic> tripleA = overlappingTriples[i];
-        print('merging $tripleA');
         if (toRemoveRangesThatHaveBeenMerged.contains(tripleA)) continue;
         for (int j = i + 1; j < overlappingTriples.length; j++) {
           final List<dynamic> tripleB = overlappingTriples[j];
-          print('trying to merge with $tripleB');
           if (math.max(tripleA[0] as int, tripleB[0] as int)
               <= math.min(tripleB[1] as int, tripleB[1] as int)
               && tripleA[2] == tripleB[2]) {
@@ -635,98 +612,23 @@ class ReplacementTextEditingController extends TextEditingController {
               math.max(tripleA[1] as int, tripleB[1] as int),
               tripleA[2],
             ];
-            print('merge succesful');
-            // toAddRangesThatHaveBeenMerged.add(mergedRange);
-          } else {
-            print('merge not succesful');
           }
         }
-        //16,40/20,34/
-        print('merged triples $tripleA');
+
         if (i != overlappingTriples.length - 1
             && !toAddRangesThatHaveBeenMerged.contains(tripleA)
             && !toRemoveRangesThatHaveBeenMerged.contains(tripleA)) {
-          print('adding merged triple');
           toAddRangesThatHaveBeenMerged.add(tripleA);
         }
       }
 
       for (final List<dynamic> tripleToRemove in toRemoveRangesThatHaveBeenMerged) {
         overlappingTriples.remove(tripleToRemove);
-        print('removing triple $tripleToRemove');
       }
 
       for (final List<dynamic> tripleToAdd in toAddRangesThatHaveBeenMerged) {
         overlappingTriples.add(tripleToAdd);
       }
-
-      // final List<dynamic> toRemoveRangesThatHaveBeenMerged = [];
-      // final List<dynamic> toAddRangesThatHaveBeenMerged = [];
-      // double starts = double.negativeInfinity;
-      // double max = double.negativeInfinity;
-      //
-      // for (int i = 0; i < overlappingTriples.length; i++) {
-      //   final List<dynamic> tripleA = overlappingTriples[i];
-      //   for (int j = i + 1; j < overlappingTriples.length; j++) {
-      //     final List<dynamic> tripleB = overlappingTriples[j];
-      //     if (math.max(tripleA[0] as int, tripleB[0] as int)
-      //         <= math.min(tripleB[1] as int, tripleB[1] as int)
-      //         && tripleA[2] == tripleB[2]) {
-      //       toRemoveRangesThatHaveBeenMerged.addAll([tripleA, tripleB]);
-      //     }
-      //   }
-      // }
-      //
-      // for (int i = 0; i < overlappingTriples.length; i++) {
-      //   final List<dynamic> tripleA = overlappingTriples[i];
-      //   if (tripleA[0] > max) {
-      //     if (i != 0) {
-      //       toAddRangesThatHaveBeenMerged.add([starts.toInt(), max.toInt(), tripleA[2]]);
-      //     }
-      //     max = tripleA[1].toDouble();
-      //     starts = tripleA[0].toDouble();
-      //   } else {
-      //     if (tripleA[1] >= max) {
-      //       max = tripleA[1].toDouble();
-      //     }
-      //   }
-      // }
-      //
-      // for (final List<dynamic> tripleToRemove in toRemoveRangesThatHaveBeenMerged) {
-      //   overlappingTriples.remove(tripleToRemove);
-      // }
-      //
-      // for (final List<dynamic> tripleToAdd in toAddRangesThatHaveBeenMerged) {
-      //   overlappingTriples.add(tripleToAdd);
-      // }
-
-      // final List<dynamic> toRemoveRangesThatHaveBeenMerged = [];
-      // final List<dynamic> toAddRangesThatHaveBeenMerged = [];
-      // for (int i = 0; i < overlappingTriples.length; i++) {
-      //   final List<dynamic> tripleA = overlappingTriples[i];
-      //   for (int j = i + 1; j < overlappingTriples.length; j++) {
-      //     final List<dynamic> tripleB = overlappingTriples[j];
-      //     if (math.max(tripleA[0] as int, tripleB[0] as int)
-      //         <= math.min(tripleB[1] as int, tripleB[1] as int)
-      //         && tripleA[2] == tripleB[2]) {
-      //       final List<dynamic> mergedRange = [
-      //         math.min(tripleA[0] as int, tripleB[0] as int),
-      //         math.max(tripleA[1] as int, tripleB[1] as int),
-      //         tripleA[2],
-      //       ];
-      //       toRemoveRangesThatHaveBeenMerged.addAll([tripleA, tripleB]);
-      //       toAddRangesThatHaveBeenMerged.add(mergedRange);
-      //     }
-      //   }
-      // }
-      //
-      // for (final List<dynamic> tripleToRemove in toRemoveRangesThatHaveBeenMerged) {
-      //   overlappingTriples.remove(tripleToRemove);
-      // }
-      //
-      // for (final List<dynamic> tripleToAdd in toAddRangesThatHaveBeenMerged) {
-      //   overlappingTriples.add(tripleToAdd);
-      // }
 
       List<int> endPoints = <int>[];
       for (List<dynamic> triple in overlappingTriples) {
@@ -766,7 +668,6 @@ class ReplacementTextEditingController extends TextEditingController {
             mergedStyles = mergedStyles.merge(style);
           }
         }
-        print('$uniqueRange and $mergedStyles');
         rangeSpanMapping[uniqueRange] = TextSpan(
             text: uniqueRange.textInside(text),
             style: mergedStyles
@@ -774,33 +675,7 @@ class ReplacementTextEditingController extends TextEditingController {
       }
     }
 
-    // if (overlap) {
-    //   print('handling overlap');
-    //   InlineSpan? generatedReplacement =
-    //   generator(matchedRange.textInside(text), matchedRange);
-    //   InlineSpan? previousGeneratedReplacement = rangeSpanMapping[matchedRange];
-    //
-    //   if (previousGeneratedReplacement is TextSpan &&
-    //       generatedReplacement is TextSpan) {
-    //     TextSpan? generatedReplacementTextSpan =
-    //     generatedReplacement;
-    //     TextSpan? previousGeneratedReplacementTextSpan =
-    //     previousGeneratedReplacement;
-    //     TextStyle? genRepStyle = generatedReplacementTextSpan.style;
-    //     TextStyle? prevRepStyle = previousGeneratedReplacementTextSpan.style;
-    //     String? text = generatedReplacementTextSpan.text;
-    //
-    //     if (text != null && genRepStyle != null && prevRepStyle != null) {
-    //       final TextStyle mergedReplacementStyle =
-    //       genRepStyle.merge(prevRepStyle);
-    //       rangeSpanMapping[matchedRange] =
-    //           TextSpan(text: text, style: mergedReplacementStyle);
-    //     }
-    //   }
-    // }
-
     if (!overlap) {
-      print('no overlaps matchedRange $matchedRange, and current text $text and text length ${text.length}');
       rangeSpanMapping[matchedRange] =
           generator(matchedRange.textInside(text), matchedRange);
     }
@@ -815,8 +690,6 @@ class ReplacementTextEditingController extends TextEditingController {
     for (final TextRange range in toRemove) {
       rangeSpanMapping.remove(range);
     }
-
-    print(rangeSpanMapping);
   }
 
   void disableExpand(TextStyle style) {
@@ -844,8 +717,6 @@ class ReplacementTextEditingController extends TextEditingController {
   }
 
   List<TextStyle> getReplacementsAtSelection(TextSelection selection) {
-    print('-----------------------getReplacementsAtSelectionStart');
-    print('getting replacements at $selection');
     // [left replacement]|[right replacement], only left replacement should be
     // reported.
     //
@@ -855,22 +726,17 @@ class ReplacementTextEditingController extends TextEditingController {
     final List<TextStyle> stylesAtSelection = <TextStyle>[];
 
     for (final TextEditingInlineSpanReplacement replacement in replacements!) {
-      print('checking replacement $replacement with style ${replacement.generator('',TextRange.empty).style!}');
       if (selection.isCollapsed) {
-        print('selection is collapsed');
         if (math.max(replacement.range.start, selection.start)
             <= math.min(replacement.range.end, selection.end)) {
-          print('selection overlaps with replacement');
           if (selection.end != replacement.range.start) {
             if (selection.start == replacement.range.end) {
               if (replacement.expand) {
-                print('added');
                 stylesAtSelection.add(replacement
                     .generator('', replacement.range)
                     .style!);
               }
             } else {
-              print('added');
               stylesAtSelection.add(replacement
                   .generator('', replacement.range)
                   .style!);
@@ -878,13 +744,10 @@ class ReplacementTextEditingController extends TextEditingController {
           }
         }
       } else {
-        print('selection not collapsed');
         if (math.max(replacement.range.start, selection.start)
             <= math.min(replacement.range.end, selection.end)) {
-          print('selection overlaps with replaceent');
           if (replacement.range.start <= selection.start &&
               replacement.range.end >= selection.end) {
-            print('added');
             stylesAtSelection.add(replacement
                 .generator('', replacement.range)
                 .style!);
@@ -893,13 +756,10 @@ class ReplacementTextEditingController extends TextEditingController {
       }
     }
 
-    print('------------------------------getReplacementsAtSelectionEnd');
-
     return stylesAtSelection;
   }
 
   void removeReplacementsAtRange(TextRange removalRange, TextStyle? attribute) {
-    print('removing replacements at range starting ---------------------------------');
     final List<TextEditingInlineSpanReplacement> toRemove = [];
     final List<TextEditingInlineSpanReplacement> toAdd = [];
 
@@ -930,13 +790,15 @@ class ReplacementTextEditingController extends TextEditingController {
           final bool removalRangeIsRangeSplitStart = removalRange == rangeSplitStart;
           final bool removalRangeIsRangeSplitEnd = removalRange == rangeSplitEnd;
 
-          if (!rangeSplitStart.isCollapsed && !removalRangeCoversReplacement && !removalRangeIsRangeSplitStart) {
-            print('Adding replacement at rangeSplitStart $rangeSplitStart when removal range $removalRange overlaps with ${replacement.range}');
+          if (!rangeSplitStart.isCollapsed
+              && !removalRangeCoversReplacement
+              && !removalRangeIsRangeSplitStart) {
             toAdd.add(replacement.copy(range: rangeSplitStart, expand: !removalRange.isCollapsed));
           }
 
-          if (!rangeSplitEnd.isCollapsed && !removalRangeCoversReplacement && !removalRangeIsRangeSplitEnd) {
-            print('Adding replacement at rangeSplitEnd $rangeSplitEnd when removal range $removalRange overlaps with ${replacement.range}');
+          if (!rangeSplitEnd.isCollapsed
+              && !removalRangeCoversReplacement
+              && !removalRangeIsRangeSplitEnd) {
             toAdd.add(replacement.copy(range: rangeSplitEnd));
           }
         }
@@ -944,15 +806,11 @@ class ReplacementTextEditingController extends TextEditingController {
     }
 
     for (TextEditingInlineSpanReplacement replacementToAdd in toAdd) {
-      print('replacement being added $replacementToAdd');
       replacements!.add(replacementToAdd);
     }
 
     for (TextEditingInlineSpanReplacement replacementToRemove in toRemove) {
-      print('replacement being removed $replacementToRemove');
       replacements!.remove(replacementToRemove);
     }
-
-    print('removing replacements at range finished ---------------------------------');
   }
 }
