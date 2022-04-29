@@ -459,6 +459,9 @@ class ReplacementTextEditingController extends TextEditingController {
               updatedReplacements.add(replacement);
             }
           }
+        }  else if (delta.replacedRange.start <= replacement.range.start
+            && delta.replacedRange.end >= replacement.range.end) {
+          toRemove.add(replacement);
         }
       } else if (delta is TextEditingDeltaNonTextUpdate) {
         // Sync non text updates.
