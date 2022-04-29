@@ -1648,6 +1648,9 @@ class ReplacementTextEditingController extends TextEditingController {
               ),
             );
           }
+        } else if (delta.deletedRange.start <= replacement.range.start
+            && delta.deletedRange.end >= replacement.range.end) {
+          toRemove.add(replacement);
         }
       } else if (delta is TextEditingDeltaReplacement) {
         final bool replacementShortenedText = delta.replacementText.length < delta.textReplaced.length;
@@ -1789,7 +1792,7 @@ class ReplacementTextEditingController extends TextEditingController {
               updatedReplacements.add(replacement);
             }
           }
-        }  else if (delta.replacedRange.start <= replacement.range.start
+        } else if (delta.replacedRange.start <= replacement.range.start
             && delta.replacedRange.end >= replacement.range.end) {
           toRemove.add(replacement);
         }
