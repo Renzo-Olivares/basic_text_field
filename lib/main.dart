@@ -101,6 +101,10 @@ class _MyHomePageState extends State<MyHomePage> {
     final List<TextStyle> replacementStyles = _replacementTextEditingController.getReplacementsAtSelection(selection);
     final List<bool> hasChanged = [false, false, false];
 
+    print('updating toggle buttons on selection changed');
+    print(replacementStyles.length);
+    print('toggle buttons before $_isSelected');
+
     if (replacementStyles.isEmpty) {
       _isSelected.fillRange(0, _isSelected.length, false);
     }
@@ -138,6 +142,8 @@ class _MyHomePageState extends State<MyHomePage> {
         hasChanged[2] = true;
       }
     }
+
+    print('toggle buttonz updated $_isSelected');
 
     setState(() {});
   }

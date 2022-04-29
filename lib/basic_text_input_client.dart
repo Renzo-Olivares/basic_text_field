@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 
 /// Signature for the callback that reports when the user changes the selection
 /// (including the cursor location).
-typedef SelectionChangedCallback = void Function(TextSelection selection, SelectionChangedCause? cause);
+typedef SelectionChangedCallback = void Function(TextSelection selection, SelectionChangedCause? cause, bool selectionRangeChanged);
 
 /// A basic text input client. An implementation of [DeltaTextInputClient] meant to
 /// send/receive information from the framework to the platform's text input plugin
@@ -504,6 +504,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     if (value == _value) return;
 
     final bool selectionChanged = _value.selection != value.selection;
+    final bool selectionRangeChanged = _value.selection.start != value.selection.start
+        || _value.selection.end != value.selection.end;
 
     if (cause == SelectionChangedCause.drag || cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.tap) {
       // Here the change is coming from gestures which call on RenderEditable to change the selection.
@@ -522,7 +524,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
 
     _value = value;
 
-    if (selectionChanged) _handleSelectionChanged(_value.selection, cause);
+    if (selectionChanged) _handleSelectionChanged(_value.selection, cause, selectionRangeChanged);
   }
 
   /// For TextSelection.
@@ -533,7 +535,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
   TextSelectionOverlay? _selectionOverlay;
   RenderEditable get renderEditable => _textKey.currentContext!.findRenderObject()! as RenderEditable;
 
-  void _handleSelectionChanged(TextSelection selection, SelectionChangedCause? cause) {
+  void _handleSelectionChanged(TextSelection selection, SelectionChangedCause? cause, [bool? selectionRangeChanged]) {
     // We return early if the selection is not valid. This can happen when the
     // text of [EditableText] is updated at the same time as the selection is
     // changed by a gesture event.
@@ -591,7 +593,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     }
 
     try {
-      widget.onSelectionChanged.call(selection, cause);
+      widget.onSelectionChanged.call(selection, cause, selectionRangeChanged ?? false);
     } catch (exception, stack) {
       FlutterError.reportError(FlutterErrorDetails(
         exception: exception,
