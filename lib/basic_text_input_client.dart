@@ -134,6 +134,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
       return;
     }
 
+    final bool selectionChanged = _value.selection != value.selection;
+
     widget.updateTextEditingDeltaHistory?.call(textEditingDeltas);
 
     _value = value;
@@ -143,6 +145,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
         (widget.controller as ReplacementTextEditingController).syncReplacementRanges(delta);
       }
     }
+
+    if (selectionChanged) widget.onSelectionChanged(value.selection, SelectionChangedCause.keyboard);
   }
 
   @override
