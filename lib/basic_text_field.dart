@@ -62,7 +62,7 @@ class _BasicTextFieldState extends State<BasicTextField> {
     return false;
   }
 
-  void _handleSelectionChanged(TextSelection selection, SelectionChangedCause? cause, bool selectionRangeChanged) {
+  void _handleSelectionChanged(TextSelection selection, SelectionChangedCause? cause) {
     final bool willShowSelectionHandles = _shouldShowSelectionHandles(cause);
     if (willShowSelectionHandles != _showSelectionHandles) {
       setState(() {
@@ -70,7 +70,7 @@ class _BasicTextFieldState extends State<BasicTextField> {
       });
     }
 
-    if (cause != null && !selectionRangeChanged) {
+    if (cause != null) {
       widget.updateToggleButtonStateOnSelectionChanged?.call(selection);
     }
   }

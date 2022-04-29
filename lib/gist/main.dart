@@ -20,6 +20,7 @@ class MyApp extends StatelessWidget {
       title: 'Flutter Delta Text Field Demo',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        useMaterial3: true,
       ),
       home: const MyHomePage(title: 'Flutter Delta Text Field Demo'),
     );
@@ -38,19 +39,136 @@ class MyHomePage extends StatefulWidget {
 class _MyHomePageState extends State<MyHomePage> {
   final ReplacementTextEditingController _replacementTextEditingController =
   ReplacementTextEditingController(
-    text: 'The quick brown fox jumps over the lazy \uffff dog.',
-    replacements: <TextEditingInlineSpanReplacement>[
-      TextEditingInlineSpanReplacement(
-        const TextRange(start: 40, end: 41),
-            (String value, TextRange range) {
-          return const WidgetSpan(
-            child: FlutterLogo(),
-          );
-        },
-      ),
-    ],
+    text: 'The quick brown fox jumps over the lazy dog.',
   );
   final FocusNode _focusNode = FocusNode();
+  final List<bool> _isSelected = [false, false, false];
+  final List<Widget> _textEditingDeltaHistory = [];
+
+  void _updateTextEditingDeltaHistory(List<TextEditingDelta> textEditingDeltas) {
+    for (final TextEditingDelta delta in textEditingDeltas) {
+      final TextEditingDeltaView deltaView;
+
+      if (delta is TextEditingDeltaInsertion) {
+        deltaView = TextEditingDeltaView(
+          deltaType: delta.runtimeType.toString().replaceAll('TextEditingDelta', ''),
+          deltaText: delta.textInserted,
+          deltaRange: TextRange.collapsed(delta.insertionOffset),
+          newSelection: delta.selection,
+          newComposing: delta.composing,
+        );
+      } else if (delta is TextEditingDeltaDeletion) {
+        deltaView = TextEditingDeltaView(
+          deltaType: delta.runtimeType.toString().replaceAll('TextEditingDelta', ''),
+          deltaText: delta.textDeleted,
+          deltaRange: delta.deletedRange,
+          newSelection: delta.selection,
+          newComposing: delta.composing,
+        );
+      } else if (delta is TextEditingDeltaReplacement) {
+        deltaView = TextEditingDeltaView(
+          deltaType: delta.runtimeType.toString().replaceAll('TextEditingDelta', ''),
+          deltaText: delta.replacementText,
+          deltaRange: delta.replacedRange,
+          newSelection: delta.selection,
+          newComposing: delta.composing,
+        );
+      } else if (delta is TextEditingDeltaNonTextUpdate) {
+        deltaView = TextEditingDeltaView(
+          deltaType: delta.runtimeType.toString().replaceAll('TextEditingDelta', ''),
+          deltaText: '',
+          deltaRange: TextRange.empty,
+          newSelection: delta.selection,
+          newComposing: delta.composing,
+        );
+      } else {
+        deltaView = const TextEditingDeltaView(
+          deltaType: 'Error',
+          deltaText: 'Error',
+          deltaRange: TextRange.empty,
+          newSelection: TextRange.empty,
+          newComposing: TextRange.empty,
+        );
+      }
+
+      _textEditingDeltaHistory.add(deltaView);
+    }
+
+    setState(() {});
+  }
+
+  void _updateToggleButtonStateOnSelectionChanged(TextSelection selection) {
+    // When the selection changes we want to check the replacements at the new
+    // selection. Enable/disable toggle buttons based on the replacements found
+    // at the new selection.
+    final List<TextStyle> replacementStyles = _replacementTextEditingController.getReplacementsAtSelection(selection);
+    final List<bool> hasChanged = [false, false, false];
+
+    if (replacementStyles.isEmpty) {
+      _isSelected.fillRange(0, _isSelected.length, false);
+    }
+
+    for (final TextStyle style in replacementStyles) {
+      if (style.fontWeight != null && !hasChanged[0]) {
+        _isSelected[0] = true;
+        hasChanged[0] = true;
+      }
+
+      if (style.fontStyle != null && !hasChanged[1]) {
+        _isSelected[1] = true;
+        hasChanged[1] = true;
+      }
+
+      if (style.decoration != null && !hasChanged[2]) {
+        _isSelected[2] = true;
+        hasChanged[2] = true;
+      }
+    }
+
+    for (final TextStyle style in replacementStyles) {
+      if (style.fontWeight == null && !hasChanged[0]) {
+        _isSelected[0] = false;
+        hasChanged[0] = true;
+      }
+
+      if (style.fontStyle == null && !hasChanged[1]) {
+        _isSelected[1] = false;
+        hasChanged[1] = true;
+      }
+
+      if (style.decoration == null && !hasChanged[2]) {
+        _isSelected[2] = false;
+        hasChanged[2] = true;
+      }
+    }
+
+    setState(() {});
+  }
+
+  Widget _buildTextEditingDeltaViewHeading(String text) {
+    return Text(
+      text,
+      style: const TextStyle(
+        fontWeight: FontWeight.w600,
+        decoration: TextDecoration.underline,
+      ),
+    );
+  }
+
+  Widget _buildTextEditingDeltaViewHeader() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 35.0, vertical: 10.0),
+      child: Row(
+        children: [
+          Expanded(child: _buildTextEditingDeltaViewHeading('Delta Type')),
+          Expanded(child: _buildTextEditingDeltaViewHeading('Delta Text')),
+          Expanded(child: _buildTextEditingDeltaViewHeading('Delta Offset')),
+          Expanded(child: _buildTextEditingDeltaViewHeading('New Selection')),
+          Expanded(child: _buildTextEditingDeltaViewHeading('New Composing')),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,57 +182,76 @@ class _MyHomePageState extends State<MyHomePage> {
             ButtonBar(
               alignment: MainAxisAlignment.center,
               children: [
-                OutlinedButton(
-                  onPressed: (){
-                    _replacementTextEditingController.applyReplacement(
+                ToggleButtons(
+                  borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+                  isSelected: _isSelected,
+                  onPressed: (int index) {
+                    Map<int, TextStyle> attributeMap = const <int, TextStyle>{
+                      0 : TextStyle(fontWeight: FontWeight.bold),
+                      1 : TextStyle(fontStyle: FontStyle.italic),
+                      2 : TextStyle(decoration: TextDecoration.underline),
+                    };
+
+                    final TextRange replacementRange = TextRange(
+                      start: _replacementTextEditingController.selection.start,
+                      end: _replacementTextEditingController.selection.end,
+                    );
+
+                    _isSelected[index] = !_isSelected[index];
+                    if (_isSelected[index]) {
+                      _replacementTextEditingController.applyReplacement(
                         TextEditingInlineSpanReplacement(
-                            TextRange(
-                                start: _replacementTextEditingController.selection.start,
-                                end: _replacementTextEditingController.selection.end,
-                            ),
-                                (string, range) => TextSpan(text: string, style: const TextStyle(fontWeight: FontWeight.bold))
+                          replacementRange,
+                              (string, range) => TextSpan(text: string, style: attributeMap[index]),
+                          true,
                         ),
-                    );
-                    setState(() {});
-                    },
-                  child: const Icon(Icons.format_bold),
-                ),
-                OutlinedButton(
-                  onPressed: (){
-                    _replacementTextEditingController.applyReplacement(
-                      TextEditingInlineSpanReplacement(
-                          TextRange(
-                            start: _replacementTextEditingController.selection.start,
-                            end: _replacementTextEditingController.selection.end,
-                          ),
-                              (string, range) => TextSpan(text: string, style: const TextStyle(fontStyle: FontStyle.italic))
-                      ),
-                    );
-                    setState(() {});
+                      );
+                      setState(() {});
+                    } else {
+                      _replacementTextEditingController.disableExpand(attributeMap[index]!);
+                      _replacementTextEditingController.removeReplacementsAtRange(replacementRange, attributeMap[index]);
+                      setState(() {});
+                    }
                   },
-                  child: const Icon(Icons.format_italic),
-                ),
-                OutlinedButton(
-                  onPressed: (){
-                    _replacementTextEditingController.applyReplacement(
-                      TextEditingInlineSpanReplacement(
-                          TextRange(
-                            start: _replacementTextEditingController.selection.start,
-                            end: _replacementTextEditingController.selection.end,
-                          ),
-                              (string, range) => TextSpan(text: string, style: const TextStyle(decoration: TextDecoration.underline))
-                      ),
-                    );
-                    setState(() {});
-                  },
-                  child: const Icon(Icons.format_underline),
+                  children: const [
+                    Icon(Icons.format_bold),
+                    Icon(Icons.format_italic),
+                    Icon(Icons.format_underline),
+                  ],
                 ),
               ],
             ),
-            BasicTextField(
-              controller: _replacementTextEditingController,
-              style: const TextStyle(color: Colors.black),
-              focusNode: _focusNode,
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 35.0),
+                child: BasicTextField(
+                  controller: _replacementTextEditingController,
+                  style: const TextStyle(color: Colors.black),
+                  focusNode: _focusNode,
+                  updateToggleButtonStateOnSelectionChanged: _updateToggleButtonStateOnSelectionChanged,
+                  updateTextEditingDeltaHistory: _updateTextEditingDeltaHistory,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Column(
+                children: [
+                  _buildTextEditingDeltaViewHeader(),
+                  Expanded(
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 35.0),
+                      itemBuilder: (BuildContext context, int index) {
+                        return _textEditingDeltaHistory.reversed.toList()[index];
+                      },
+                      itemCount: _textEditingDeltaHistory.length,
+                      separatorBuilder: (BuildContext context, int index) {
+                        return const Divider(height: 5.0);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+              ),
             ),
           ],
         ),
@@ -123,22 +260,82 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 }
 
+class TextEditingDeltaView extends StatelessWidget {
+  const TextEditingDeltaView({
+    Key? key,
+    required this.deltaType,
+    required this.deltaText,
+    required this.deltaRange,
+    required this.newSelection,
+    required this.newComposing
+  }) : super(key: key);
+
+  final String deltaType;
+  final String deltaText;
+  final TextRange deltaRange;
+  final TextRange newSelection;
+  final TextRange newComposing;
+
+  @override
+  Widget build(BuildContext context) {
+    late final Color rowColor;
+
+    switch (deltaType) {
+      case 'Insertion':
+        rowColor = Colors.greenAccent;
+        break;
+      case 'Deletion':
+        rowColor = Colors.redAccent;
+        break;
+      case 'Replacement':
+        rowColor = Colors.yellowAccent;
+        break;
+      case 'NonTextUpdate':
+        rowColor = Colors.blueAccent;
+        break;
+      default:
+        rowColor = Colors.white;
+    }
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+        color: rowColor,
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text(deltaType)),
+          Expanded(child: Text(deltaText)),
+          Expanded(child: Text('(${deltaRange.start}, ${deltaRange.end})')),
+          Expanded(child: Text('(${newSelection.start}, ${newSelection.end})')),
+          Expanded(child: Text('(${newComposing.start}, ${newComposing.end})')),
+        ],
+      ),
+    );
+  }
+}
+
+typedef AnySelectionChangedCallback = void Function(TextSelection selection);
+typedef TextEditingDeltaHistoryUpdateCallback = void Function(List<TextEditingDelta> textEditingDeltas);
+
 /// A basic text field. Defines the appearance of a basic text input client.
 class BasicTextField extends StatefulWidget {
   const BasicTextField({
     Key? key,
     required this.controller,
     required this.style,
-    required this.focusNode
+    required this.focusNode,
+    this.updateToggleButtonStateOnSelectionChanged,
+    this.updateTextEditingDeltaHistory,
   }) : super(key: key);
 
   final TextEditingController controller;
   final TextStyle style;
   final FocusNode focusNode;
+  final AnySelectionChangedCallback? updateToggleButtonStateOnSelectionChanged;
+  final TextEditingDeltaHistoryUpdateCallback? updateTextEditingDeltaHistory;
 
   @override
   State<BasicTextField> createState() => _BasicTextFieldState();
-
 }
 
 class _BasicTextFieldState extends State<BasicTextField> {
@@ -162,7 +359,8 @@ class _BasicTextFieldState extends State<BasicTextField> {
       return false;
     }
 
-    if (cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.scribble) {
+    if (cause == SelectionChangedCause.longPress
+        || cause == SelectionChangedCause.scribble) {
       return true;
     }
 
@@ -180,6 +378,27 @@ class _BasicTextFieldState extends State<BasicTextField> {
         _showSelectionHandles = willShowSelectionHandles;
       });
     }
+
+    if (cause != null) {
+      widget.updateToggleButtonStateOnSelectionChanged?.call(selection);
+    }
+  }
+
+  void _onDragUpdate(DragUpdateDetails details) {
+    final Offset startOffset = _renderEditable.maxLines == 1
+        ? Offset(_renderEditable.offset.pixels - _dragStartViewportOffset, 0.0)
+        : Offset(0.0, _renderEditable.offset.pixels - _dragStartViewportOffset);
+
+    _renderEditable.selectPositionAt(
+      from: _startDetails.globalPosition - startOffset,
+      to: details.globalPosition,
+      cause: SelectionChangedCause.drag,
+    );
+  }
+
+  void _onDragStart(DragStartDetails details) {
+    _startDetails = details;
+    _dragStartViewportOffset = _renderEditable.offset.pixels;
   }
 
   @override
@@ -207,21 +426,8 @@ class _BasicTextFieldState extends State<BasicTextField> {
       focusNode: widget.focusNode,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onPanStart: (DragStartDetails details) {
-          _startDetails = details;
-          _dragStartViewportOffset = _renderEditable.offset.pixels;
-        },
-        onPanUpdate: (DragUpdateDetails details) {
-          final Offset startOffset = _renderEditable.maxLines == 1
-              ? Offset(_renderEditable.offset.pixels - _dragStartViewportOffset, 0.0)
-              : Offset(0.0, _renderEditable.offset.pixels - _dragStartViewportOffset);
-
-          _renderEditable.selectPositionAt(
-            from: _startDetails.globalPosition - startOffset,
-            to: details.globalPosition,
-            cause: SelectionChangedCause.drag,
-          );
-        },
+        onPanStart: (DragStartDetails details) => _onDragStart(details),
+        onPanUpdate: (DragUpdateDetails details) => _onDragUpdate(details),
         onTap: () {
           _textInputClient!.requestKeyboard();
         },
@@ -250,24 +456,27 @@ class _BasicTextFieldState extends State<BasicTextField> {
               break;
           }
         },
-        onLongPressEnd: (LongPressEndDetails details) {
-          _textInputClient!.showToolbar();
-        },
-        child: Container(
-          height: 300,
-          width: 300,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.blue),
-            borderRadius: const BorderRadius.all(Radius.circular(4.0)),
-          ),
-          child: BasicTextInputClient(
-            key: textInputClientKey,
-            controller: widget.controller,
-            style: widget.style,
-            focusNode: widget.focusNode,
-            selectionControls: _textSelectionControls,
-            onSelectionChanged: _handleSelectionChanged,
-            showSelectionHandles: _showSelectionHandles,
+        onLongPressEnd: (LongPressEndDetails details) => _textInputClient!.showToolbar(),
+        onHorizontalDragStart: (DragStartDetails details) => _onDragStart(details),
+        onHorizontalDragUpdate: (DragUpdateDetails details) => _onDragUpdate(details),
+        child: SizedBox(
+          height: double.infinity,
+          width: MediaQuery.of(context).size.width,
+          child: Container(
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.black),
+              borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+            ),
+            child: BasicTextInputClient(
+              key: textInputClientKey,
+              controller: widget.controller,
+              style: widget.style,
+              focusNode: widget.focusNode,
+              selectionControls: _textSelectionControls,
+              onSelectionChanged: _handleSelectionChanged,
+              showSelectionHandles: _showSelectionHandles,
+              updateTextEditingDeltaHistory: widget.updateTextEditingDeltaHistory,
+            ),
           ),
         ),
       ),
@@ -291,6 +500,7 @@ class BasicTextInputClient extends StatefulWidget {
     this.selectionControls,
     required this.onSelectionChanged,
     required this.showSelectionHandles,
+    this.updateTextEditingDeltaHistory,
   }) : super(key: key);
 
   final TextEditingController controller;
@@ -299,12 +509,14 @@ class BasicTextInputClient extends StatefulWidget {
   final TextSelectionControls? selectionControls;
   final bool showSelectionHandles;
   final SelectionChangedCallback onSelectionChanged;
+  final TextEditingDeltaHistoryUpdateCallback? updateTextEditingDeltaHistory;
 
   @override
   State<BasicTextInputClient> createState() => BasicTextInputClientState();
 }
 
-class BasicTextInputClientState extends State<BasicTextInputClient> with TextSelectionDelegate implements DeltaTextInputClient {
+class BasicTextInputClientState extends State<BasicTextInputClient>
+    with TextSelectionDelegate implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
   final ClipboardStatusNotifier? _clipboardStatus = kIsWeb ? null : ClipboardStatusNotifier();
 
@@ -334,7 +546,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   }
 
   @override
-  // TODO: implement currentAutofillScope
   // Will not implement.
   AutofillScope? get currentAutofillScope => throw UnimplementedError();
 
@@ -343,41 +554,40 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   void insertTextPlaceholder(Size size) {
-    // TODO: implement insertTextPlaceholder
+    // Will not implement. This method is used for Scribble support.
   }
 
   @override
   void performAction(TextInputAction action) {
-    // TODO: implement performAction
+    // Will not implement.
   }
 
   @override
   void performPrivateCommand(String action, Map<String, dynamic> data) {
-    // TODO: implement performPrivateCommand
+    // Will not implement.
   }
 
   @override
   void removeTextPlaceholder() {
-    // TODO: implement removeTextPlaceholder
+    // Will not implement. This method is used for Scribble support.
   }
 
   @override
   void showAutocorrectionPromptRect(int start, int end) {
-    // TODO: implement showAutocorrectionPromptRect
+    // Will not implement.
   }
 
   @override
   bool showToolbar() {
     // On the web use provided native dom elements to provide clipboard functionality.
-    if (kIsWeb) {
-      return false;
-    }
+    if (kIsWeb) return false;
 
     if (_selectionOverlay == null || _selectionOverlay!.toolbarIsVisible) {
       return false;
     }
 
     _selectionOverlay!.showToolbar();
+
     return true;
   }
 
@@ -401,6 +611,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       return;
     }
 
+    widget.updateTextEditingDeltaHistory?.call(textEditingDeltas);
+
     _value = value;
 
     if (widget.controller is ReplacementTextEditingController) {
@@ -412,7 +624,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   void updateFloatingCursor(RawFloatingCursorPoint point) {
-    // TODO: implement updateFloatingCursor
+    // Will not implement.
   }
 
   /// Open/close [DeltaTextInputClient]
@@ -522,11 +734,15 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       (widget.controller as ReplacementTextEditingController).syncReplacementRanges(textEditingDelta);
     }
 
+    if (value != _value) {
+      widget.updateTextEditingDeltaHistory?.call([textEditingDelta]);
+    }
+
     userUpdateTextEditingValue(value, cause);
   }
 
   /// Keyboard text editing actions.
-  // TODO(justinmc): Handling of the default text editing shortcuts with deltas
+  // The Handling of the default text editing shortcuts with deltas
   // needs to be in the framework somehow.  This should go through some kind of
   // generic "replace" method like in EditableText.
   // EditableText converts intents like DeleteCharacterIntent to a generic
@@ -543,16 +759,14 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   };
 
   void _delete() {
-    if (_value.text.isEmpty) {
-      return;
-    }
+    if (_value.text.isEmpty) return;
 
     late final TextRange deletedRange;
+    late final TextRange newComposing;
+    final int deletedLength = _value.text.substring(0, _selection.baseOffset).characters.last.length;
+
     if (_selection.isCollapsed) {
-      if (_selection.baseOffset == 0) {
-        return;
-      }
-      final int deletedLength = _value.text.substring(0, _selection.baseOffset).characters.last.length;
+      if (_selection.baseOffset == 0) return;
       deletedRange = TextRange(
         start: _selection.baseOffset - deletedLength,
         end: _selection.baseOffset,
@@ -561,11 +775,19 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       deletedRange = _selection;
     }
 
+    final bool isComposing = _selection.isCollapsed && _value.isComposingRangeValid;
+
+    if (isComposing) {
+      newComposing = TextRange.collapsed(deletedRange.start);
+    } else {
+      newComposing = TextRange.empty;
+    }
+
     _userUpdateTextEditingValueWithDelta(
       TextEditingDeltaDeletion(
         oldText: _value.text,
         selection: TextSelection.collapsed(offset: deletedRange.start),
-        composing: TextRange.collapsed(deletedRange.start),
+        composing: newComposing,
         deletedRange: deletedRange,
       ),
       SelectionChangedCause.keyboard,
@@ -579,12 +801,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       final int lastOffset = _selection.isNormalized ? _selection.end : _selection.start;
       selection = TextSelection.collapsed(offset: forward ? lastOffset : firstOffset);
     } else {
-      if (forward && _selection.baseOffset == _value.text.length) {
-        return;
-      }
-      if (!forward && _selection.baseOffset == 0) {
-        return;
-      }
+      if (forward && _selection.baseOffset == _value.text.length) return;
+      if (!forward && _selection.baseOffset == 0) return;
       final int adjustment = forward
           ? _value.text.substring(_selection.baseOffset).characters.first.length
           : -_value.text.substring(0, _selection.baseOffset).characters.last.length;
@@ -636,9 +854,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   // Only update the platform's text input plugin's text editing value when it has changed
   // to avoid sending duplicate update messages to the engine.
   void _updateRemoteTextEditingValueIfNeeded() {
-    if (_lastKnownRemoteTextEditingValue == _value) {
-      return;
-    }
+    if (_lastKnownRemoteTextEditingValue == _value) return;
 
     if (_textInputConnection != null) {
       _textInputConnection!.setEditingState(_value);
@@ -649,15 +865,13 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   /// [TextSelectionDelegate] method implementations.
   @override
   void bringIntoView(TextPosition position) {
-    // TODO: implement bringIntoView
+    // Not implemented.
   }
 
   @override
   void copySelection(SelectionChangedCause cause) {
     final TextSelection copyRange = textEditingValue.selection;
-    if (!copyRange.isValid || copyRange.isCollapsed) {
-      return;
-    }
+    if (!copyRange.isValid || copyRange.isCollapsed) return;
     final String text = textEditingValue.text;
     Clipboard.setData(ClipboardData(text: copyRange.textInside(text)));
 
@@ -692,9 +906,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     final TextSelection cutRange = textEditingValue.selection;
     final String text = textEditingValue.text;
 
-    if (cutRange.isCollapsed) {
-      return;
-    }
+    if (cutRange.isCollapsed) return;
     Clipboard.setData(ClipboardData(text: cutRange.textInside(text)));
     final int lastSelectionIndex = math.min(cutRange.baseOffset, cutRange.extentOffset);
     _userUpdateTextEditingValueWithDelta(
@@ -707,9 +919,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       ),
       cause,
     );
-    if (cause == SelectionChangedCause.toolbar) {
-      hideToolbar();
-    }
+    if (cause == SelectionChangedCause.toolbar) hideToolbar();
     _clipboardStatus?.update();
   }
 
@@ -727,14 +937,10 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
   @override
   Future<void> pasteText(SelectionChangedCause cause) async {
     final TextSelection pasteRange = textEditingValue.selection;
-    if (!pasteRange.isValid) {
-      return;
-    }
+    if (!pasteRange.isValid) return;
 
     final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
-    if (data == null) {
-      return;
-    }
+    if (data == null) return;
 
     // After the paste, the cursor should be collapsed and located after the
     // pasted content.
@@ -751,9 +957,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
       cause,
     );
 
-    if (cause == SelectionChangedCause.toolbar) {
-      hideToolbar();
-    }
+    if (cause == SelectionChangedCause.toolbar) hideToolbar();
   }
 
   @override
@@ -774,22 +978,28 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
 
   @override
   void userUpdateTextEditingValue(TextEditingValue value, SelectionChangedCause cause) {
-    if (value == _value) {
-      return;
-    }
+    if (value == _value) return;
 
     final bool selectionChanged = _value.selection != value.selection;
 
-    if (cause == SelectionChangedCause.drag || cause == SelectionChangedCause.longPress) {
+    if (cause == SelectionChangedCause.drag || cause == SelectionChangedCause.longPress || cause == SelectionChangedCause.tap) {
       // Here the change is coming from gestures which call on RenderEditable to change the selection.
-      // TODO: Should we create a delta and apply it here instead of just setting the value?
+      // Create a TextEditingDeltaNonTextUpdate so we can keep track of the delta history. RenderEditable
+      // does not report a delta on selection change.
+      final bool textChanged = _value.text != value.text;
+      if (selectionChanged && !textChanged) {
+        final TextEditingDeltaNonTextUpdate selectionUpdate = TextEditingDeltaNonTextUpdate(
+          oldText: value.text,
+          selection: value.selection,
+          composing: value.composing,
+        );
+        widget.updateTextEditingDeltaHistory?.call([selectionUpdate]);
+      }
     }
 
     _value = value;
 
-    if (selectionChanged) {
-      _handleSelectionChanged(_value.selection, cause);
-    }
+    if (selectionChanged) _handleSelectionChanged(_value.selection, cause);
   }
 
   /// For TextSelection.
@@ -804,9 +1014,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     // We return early if the selection is not valid. This can happen when the
     // text of [EditableText] is updated at the same time as the selection is
     // changed by a gesture event.
-    if (!widget.controller.isSelectionWithinTextBounds(selection)) {
-      return;
-    }
+    if (!widget.controller.isSelectionWithinTextBounds(selection)) return;
 
     widget.controller.selection = selection;
 
@@ -871,58 +1079,72 @@ class BasicTextInputClientState extends State<BasicTextInputClient> with TextSel
     }
   }
 
+  static final Map<ShortcutActivator, Intent> _defaultWebShortcuts = <ShortcutActivator, Intent>{
+    // Activation
+    const SingleActivator(LogicalKeyboardKey.space): DoNothingAndStopPropagationIntent(),
+
+    // Scrolling
+    const SingleActivator(LogicalKeyboardKey.arrowUp): DoNothingAndStopPropagationIntent(),
+    const SingleActivator(LogicalKeyboardKey.arrowDown): DoNothingAndStopPropagationIntent(),
+    const SingleActivator(LogicalKeyboardKey.arrowLeft): DoNothingAndStopPropagationIntent(),
+    const SingleActivator(LogicalKeyboardKey.arrowRight): DoNothingAndStopPropagationIntent(),
+  };
+
   @override
   Widget build(BuildContext context) {
-    return Actions(
-      actions: _actions,
-      child: Focus(
-        focusNode: widget.focusNode,
-        child: Scrollable(
-          viewportBuilder: (BuildContext context, ViewportOffset position) {
-            return CompositedTransformTarget(
-              link: _toolbarLayerLink,
-              child: _Editable(
-                key: _textKey,
-                startHandleLayerLink: _startHandleLayerLink,
-                endHandleLayerLink: _endHandleLayerLink,
-                inlineSpan: _buildTextSpan(),
-                value: _value, // We pass value.selection to RenderEditable.
-                cursorColor: Colors.blue,
-                backgroundCursorColor: Colors.grey[100], // TODO: document.
-                showCursor: ValueNotifier<bool>(true),
-                forceLine: true, // Whether text field will take full line regardless of width.
-                readOnly: false, // editable text-field.
-                hasFocus: _hasFocus,
-                maxLines: null, // multi-line text-field.
-                minLines: null,
-                expands: false, // expands to height of parent.
-                strutStyle: null, // TODO: document.
-                selectionColor: Colors.blue.withOpacity(0.40),
-                textScaleFactor: MediaQuery.textScaleFactorOf(context), // TODO: document.
-                textAlign: TextAlign.left, // TODO: make variable.
-                textDirection: _textDirection,
-                locale: Localizations.maybeLocaleOf(context), // TODO: document.
-                textHeightBehavior: DefaultTextHeightBehavior.of(context), // TODO: make variable.
-                textWidthBasis: TextWidthBasis.parent, // TODO: document.
-                obscuringCharacter: '•',
-                obscureText: false, // This is a non-private text field that does not require obfuscation.
-                offset: position,
-                onCaretChanged: null, // TODO: implement.
-                rendererIgnoresPointer: true, // TODO: document.
-                cursorWidth: 2.0,
-                cursorHeight: null,
-                cursorRadius: const Radius.circular(2.0),
-                cursorOffset: Offset.zero,
-                paintCursorAboveText: false, // TODO: document.
-                enableInteractiveSelection: true, // make true to enable selection on mobile.
-                textSelectionDelegate: this,
-                devicePixelRatio: MediaQuery.of(context).devicePixelRatio, // TODO: document.
-                promptRectRange: null, // TODO: document.
-                promptRectColor: null, // TODO: document.
-                clipBehavior: Clip.hardEdge, // TODO: document.
-              ),
-            );
-          },
+    return Shortcuts(
+      shortcuts: kIsWeb ? _defaultWebShortcuts : <ShortcutActivator, Intent>{},
+      child: Actions(
+        actions: _actions,
+        child: Focus(
+          focusNode: widget.focusNode,
+          child: Scrollable(
+            viewportBuilder: (BuildContext context, ViewportOffset position) {
+              return CompositedTransformTarget(
+                link: _toolbarLayerLink,
+                child: _Editable(
+                  key: _textKey,
+                  startHandleLayerLink: _startHandleLayerLink,
+                  endHandleLayerLink: _endHandleLayerLink,
+                  inlineSpan: _buildTextSpan(),
+                  value: _value, // We pass value.selection to RenderEditable.
+                  cursorColor: Colors.blue,
+                  backgroundCursorColor: Colors.grey[100],
+                  showCursor: ValueNotifier<bool>(true),
+                  forceLine: true, // Whether text field will take full line regardless of width.
+                  readOnly: false, // editable text-field.
+                  hasFocus: _hasFocus,
+                  maxLines: null, // multi-line text-field.
+                  minLines: null,
+                  expands: false, // expands to height of parent.
+                  strutStyle: null,
+                  selectionColor: Colors.blue.withOpacity(0.40),
+                  textScaleFactor: MediaQuery.textScaleFactorOf(context),
+                  textAlign: TextAlign.left,
+                  textDirection: _textDirection,
+                  locale: Localizations.maybeLocaleOf(context),
+                  textHeightBehavior: DefaultTextHeightBehavior.of(context),
+                  textWidthBasis: TextWidthBasis.parent,
+                  obscuringCharacter: '•',
+                  obscureText: false, // This is a non-private text field that does not require obfuscation.
+                  offset: position,
+                  onCaretChanged: null,
+                  rendererIgnoresPointer: true,
+                  cursorWidth: 2.0,
+                  cursorHeight: null,
+                  cursorRadius: const Radius.circular(2.0),
+                  cursorOffset: Offset.zero,
+                  paintCursorAboveText: false,
+                  enableInteractiveSelection: true, // make true to enable selection on mobile.
+                  textSelectionDelegate: this,
+                  devicePixelRatio: MediaQuery.of(context).devicePixelRatio,
+                  promptRectRange: null,
+                  promptRectColor: null,
+                  clipBehavior: Clip.hardEdge,
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -1115,9 +1337,6 @@ class _Editable extends MultiChildRenderObjectWidget {
 ///
 /// This used in [ReplacementTextEditingController] to generate [InlineSpan]s when
 /// a match is found for replacement.
-///
-/// If returning a [PlaceholderSpan], the [TextRange] must be passed to the
-/// [PlaceholderSpan] constructor.
 typedef InlineSpanGenerator = InlineSpan Function(String, TextRange);
 
 /// Represents one "replacement" to check for, consisting of a [TextRange] to
@@ -1126,25 +1345,7 @@ typedef InlineSpanGenerator = InlineSpan Function(String, TextRange);
 ///
 /// The generator function is called for every match of the range found.
 ///
-/// Typically, the generator should return a custom [TextSpan] with unique styling
-/// or a [WidgetSpan] to embed widgets within text fields.
-///
-/// {@tool snippet}
-/// In this example, all strings enclosed in the range from 0 to 5 is matched and
-/// the contents of the braces are interpreted as an image url.
-///
-/// ```dart
-/// TextEditingInlineSpanReplacement(
-///   TextRange(start: 0, end: 5),
-///   (String value, TextRange range) {
-///     return WidgetSpan(
-///       child: Image.asset(value.substring(1, value.length - 1)),
-///       range: range,
-///     );
-///   },
-/// )
-/// ```
-/// {@end-tool}
+/// Typically, the generator should return a custom [TextSpan] with unique styling.
 ///
 /// {@tool snippet}
 /// In this simple example, the text in the range of 0 to 5 is styled in blue.
@@ -1166,7 +1367,7 @@ typedef InlineSpanGenerator = InlineSpan Function(String, TextRange);
 class TextEditingInlineSpanReplacement {
   /// Constructs a replacement that replaces matches of the [TextRange] with the
   /// output of the [generator].
-  TextEditingInlineSpanReplacement(this.range, this.generator);
+  TextEditingInlineSpanReplacement(this.range, this.generator, this.expand);
 
   /// The [TextRange] to replace.
   ///
@@ -1175,16 +1376,14 @@ class TextEditingInlineSpanReplacement {
 
   /// Function that returns an [InlineSpan] instance for each match of
   /// [TextRange].
-  ///
-  /// When returning a [PlaceholderSpan] such as [WidgetSpan], the [TextRange] argument
-  /// must be provided to the [PlaceholderSpan] constructor so that the caret position
-  /// can be computed properly.
   InlineSpanGenerator generator;
+
+  bool expand;
 
   /// Creates a new replacement with all properties copied except for range, which
   /// is updated to the specified value.
-  TextEditingInlineSpanReplacement copy({required TextRange range}) {
-    return TextEditingInlineSpanReplacement(range, generator);
+  TextEditingInlineSpanReplacement copy({TextRange? range, bool? expand}) {
+    return TextEditingInlineSpanReplacement(range ?? this.range, generator, expand ?? this.expand);
   }
 
   @override
@@ -1205,9 +1404,10 @@ class ReplacementTextEditingController extends TextEditingController {
   /// Constructs a controller with optional text that handles the provided list of replacements.
   ReplacementTextEditingController({
     String? text,
-    this.replacements,
+    List<TextEditingInlineSpanReplacement>? replacements,
     this.composingRegionReplaceable = true,
-  }) : super(text: text);
+  }) : replacements = replacements ?? [],
+        super(text: text);
 
   /// Creates a controller for an editable text field from an initial [TextEditingValue].
   ///
@@ -1221,9 +1421,6 @@ class ReplacementTextEditingController extends TextEditingController {
   ///
   /// Each replacement is evaluated in order from first to last. If multiple replacement
   /// [TextRange]s match against the same range of text,
-  /// TODO: What happens when replacements match against same range of text?
-  ///
-  /// TODO: Give an example of replacements matching against the same range of text.
   List<TextEditingInlineSpanReplacement>? replacements;
 
   /// If composing regions should be matched against for replacements.
@@ -1293,22 +1490,31 @@ class ReplacementTextEditingController extends TextEditingController {
   /// ranges of replacement, should be skipped and not updated as their values are
   /// not offset by the replacement.
   void syncReplacementRanges(TextEditingDelta delta) {
-    if (replacements == null) {
-      return;
-    }
+    if (replacements == null) return;
 
-    if (text.isEmpty) {
-      replacements!.clear();
-    }
+    if (text.isEmpty) replacements!.clear();
 
     List<TextEditingInlineSpanReplacement> updatedReplacements = [];
+    List<TextEditingInlineSpanReplacement> toRemove = [];
 
     for (final TextEditingInlineSpanReplacement replacement
     in replacements!) {
       // Syncing insertions.
       if (delta is TextEditingDeltaInsertion) {
-        if (delta.insertionOffset > replacement.range.start &&
-            delta.insertionOffset < replacement.range.end) {
+        if (delta.insertionOffset == replacement.range.end
+            && delta.insertionOffset == replacement.range.start) {
+          if (replacement.expand) {
+            updatedReplacements.add(
+              replacement.copy(
+                range: TextRange(
+                  start: replacement.range.start,
+                  end: replacement.range.end + delta.textInserted.length,
+                ),
+              ),
+            );
+          }
+        } else if (delta.insertionOffset > replacement.range.start
+            && delta.insertionOffset < replacement.range.end) {
           // Update replacement where insertion offset is inclusively within replacement range.
           updatedReplacements.add(
             replacement.copy(
@@ -1331,7 +1537,8 @@ class ReplacementTextEditingController extends TextEditingController {
               ),
             ),
           );
-        } else if (delta.insertionOffset == replacement.range.start || delta.insertionOffset == replacement.range.end) {
+        } else if (delta.insertionOffset == replacement.range.start
+            || delta.insertionOffset == replacement.range.end) {
           if (delta.insertionOffset == replacement.range.start) {
             // Updating replacement where insertion offset touches front edge of replacement range.
             updatedReplacements.add(
@@ -1344,13 +1551,24 @@ class ReplacementTextEditingController extends TextEditingController {
             );
           } else if (delta.insertionOffset == replacement.range.end) {
             // Updating replacement where insertion offset touches back edge of replacement range.
-            updatedReplacements.add(replacement);
+            if (replacement.expand) {
+              updatedReplacements.add(
+                replacement.copy(
+                  range: TextRange(
+                    start: replacement.range.start,
+                    end: replacement.range.end + delta.textInserted.length,
+                  ),
+                ),
+              );
+            } else {
+              updatedReplacements.add(replacement);
+            }
           }
         }
       } else if (delta is TextEditingDeltaDeletion) {
         // Syncing deletions.
-        if (delta.deletedRange.start >= replacement.range.start &&
-            delta.deletedRange.end <= replacement.range.end) {
+        if (delta.deletedRange.start >= replacement.range.start
+            && delta.deletedRange.end <= replacement.range.end) {
           // Update replacement ranges directly inclusively associated with deleted range.
           if (replacement.range.start !=
               replacement.range.end - delta.textDeleted.length) {
@@ -1364,9 +1582,10 @@ class ReplacementTextEditingController extends TextEditingController {
             );
           } else {
             // Removing replacement.
+            toRemove.add(replacement);
           }
-        } else if (delta.deletedRange.start > replacement.range.end &&
-            delta.deletedRange.end > replacement.range.end) {
+        } else if (delta.deletedRange.start > replacement.range.end
+            && delta.deletedRange.end > replacement.range.end) {
           // Replacements that occurred before deletion range do not need updating.
           updatedReplacements.add(replacement);
         } else if (delta.deletedRange.end < replacement.range.start) {
@@ -1379,14 +1598,43 @@ class ReplacementTextEditingController extends TextEditingController {
               ),
             ),
           );
-        } else if (delta.deletedRange.start == replacement.range.start ||
-            delta.deletedRange.start == replacement.range.end ||
-            delta.deletedRange.end == replacement.range.start ||
-            delta.deletedRange.end == replacement.range.end) {
-          if (delta.deletedRange.start == replacement.range.end || delta.deletedRange.end == replacement.range.end) {
-            // Updating replacement where the deleted range touches back edge of replacement range.
-            updatedReplacements.add(replacement);
-          } else if (delta.deletedRange.start == replacement.range.start || delta.deletedRange.end == replacement.range.start) {
+        } else if (delta.deletedRange.start == replacement.range.start
+            || delta.deletedRange.start == replacement.range.end
+            || delta.deletedRange.end == replacement.range.start
+            || delta.deletedRange.end == replacement.range.end) {
+          if (delta.deletedRange.start == replacement.range.end
+              || delta.deletedRange.end == replacement.range.end) {
+            // Updating replacement where the deleted range touches back edge of replacement range
+            if (delta.deletedRange.start == replacement.range.end) {
+              updatedReplacements.add(replacement);
+            }
+
+            if (delta.deletedRange.end == replacement.range.end) {
+              if (replacement.expand) {
+                final int end = replacement.range.end -
+                    delta.textDeleted.length;
+                if (replacement.range.start == end) {
+                  toRemove.add(replacement);
+                } else {
+                  updatedReplacements.add(
+                    replacement.copy(
+                      range: TextRange(
+                        start: replacement.range.start,
+                        end: end,
+                      ),
+                    ),
+                  );
+                }
+              } else {
+                if (replacement.range.start == replacement.range.end) {
+                  toRemove.add(replacement);
+                } else {
+                  updatedReplacements.add(replacement);
+                }
+              }
+            }
+          } else if (delta.deletedRange.start == replacement.range.start
+              || delta.deletedRange.end == replacement.range.start) {
             // Updating replacement where the deleted range touches front edge of replacement range.
             updatedReplacements.add(
               replacement.copy(
@@ -1405,34 +1653,73 @@ class ReplacementTextEditingController extends TextEditingController {
         final int changedOffset = replacementShortenedText ? delta.textReplaced.length - delta.replacementText.length : delta.replacementText.length - delta.textReplaced.length;
 
         // Syncing replacements.
-        if (delta.replacedRange.start >= replacement.range.start &&
-            delta.replacedRange.end <= replacement.range.end) {
+        if (delta.replacedRange.start >= replacement.range.start
+            && delta.replacedRange.end <= replacement.range.end) {
           // Update replacement ranges directly inclusively associated with replaced range.
           final int replacementEndOffset = replacement.range.end;
           final int replacementStartOffset = replacement.range.start;
 
           if (replacementLengthenedText) {
             updatedReplacements.add(
-                replacement.copy(range: TextRange(start: replacementStartOffset, end: delta.replacedRange.start))
+              replacement.copy(
+                range: TextRange(
+                  start: replacementStartOffset,
+                  end: delta.replacedRange.start,
+                ),
+              ),
             );
-            updatedReplacements.add(replacement.copy(range: TextRange(start: delta.replacedRange.end + changedOffset, end: replacementEndOffset + changedOffset)));
+
+            updatedReplacements.add(
+              replacement.copy(
+                range: TextRange(
+                  start: delta.replacedRange.end + changedOffset,
+                  end: replacementEndOffset + changedOffset,
+                ),
+              ),
+            );
           }
 
           if (replacementShortenedText) {
             updatedReplacements.add(
-                replacement.copy(range: TextRange(start: replacementStartOffset, end: delta.replacedRange.start))
+              replacement.copy(
+                range: TextRange(
+                  start: replacementStartOffset,
+                  end: delta.replacedRange.start,
+                ),
+              ),
             );
-            updatedReplacements.add(replacement.copy(range: TextRange(start: delta.replacedRange.end - changedOffset, end: replacementEndOffset - changedOffset)));
+
+            updatedReplacements.add(
+              replacement.copy(
+                range: TextRange(
+                  start: delta.replacedRange.end - changedOffset,
+                  end: replacementEndOffset - changedOffset,
+                ),
+              ),
+            );
           }
 
           if (replacementEqualLength) {
             updatedReplacements.add(
-                replacement.copy(range: TextRange(start: replacementStartOffset, end: delta.replacedRange.start))
+              replacement.copy(
+                range: TextRange(
+                  start: replacementStartOffset,
+                  end: delta.replacedRange.start,
+                ),
+              ),
             );
-            updatedReplacements.add(replacement.copy(range: TextRange(start: delta.replacedRange.end, end: replacementEndOffset)));
+
+            updatedReplacements.add(
+              replacement.copy(
+                range: TextRange(
+                  start: delta.replacedRange.end,
+                  end: replacementEndOffset,
+                ),
+              ),
+            );
           }
-        } else if (delta.replacedRange.start > replacement.range.end &&
-            delta.replacedRange.end > replacement.range.end) {
+        } else if (delta.replacedRange.start > replacement.range.end
+            && delta.replacedRange.end > replacement.range.end) {
           // Replacements that occurred before replaced range do not need updating.
           updatedReplacements.add(replacement);
         } else if (delta.replacedRange.end < replacement.range.start) {
@@ -1462,14 +1749,16 @@ class ReplacementTextEditingController extends TextEditingController {
           if (replacementEqualLength) {
             updatedReplacements.add(replacement);
           }
-        } else if (delta.replacedRange.start == replacement.range.start ||
-            delta.replacedRange.start == replacement.range.end ||
-            delta.replacedRange.end == replacement.range.start ||
-            delta.replacedRange.end == replacement.range.end) {
-          if (delta.replacedRange.start == replacement.range.end || delta.replacedRange.end == replacement.range.end) {
+        } else if (delta.replacedRange.start == replacement.range.start
+            || delta.replacedRange.start == replacement.range.end
+            || delta.replacedRange.end == replacement.range.start
+            || delta.replacedRange.end == replacement.range.end) {
+          if (delta.replacedRange.start == replacement.range.end
+              || delta.replacedRange.end == replacement.range.end) {
             // Updating replacement where the replaced range touches back edge of replacement range.
             updatedReplacements.add(replacement);
-          } else if (delta.replacedRange.start == replacement.range.start || delta.replacedRange.end == replacement.range.start) {
+          } else if (delta.replacedRange.start == replacement.range.start
+              || delta.replacedRange.end == replacement.range.start) {
             // Updating replacement where the replaced range touches front edge of replacement range.
             if (replacementLengthenedText) {
               updatedReplacements.add(
@@ -1508,6 +1797,12 @@ class ReplacementTextEditingController extends TextEditingController {
       replacements!.clear();
       replacements!.addAll(updatedReplacements);
     }
+
+    if (updatedReplacements.isEmpty) {
+      for (final TextEditingInlineSpanReplacement replacementToRemove in toRemove) {
+        replacements!.remove(replacementToRemove);
+      }
+    }
   }
 
   @override
@@ -1516,22 +1811,21 @@ class ReplacementTextEditingController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
-    assert(!value.composing.isValid ||
-        !withComposing ||
-        value.isComposingRangeValid);
+    assert(!value.composing.isValid
+        || !withComposing
+        || value.isComposingRangeValid);
 
     // Keep a mapping of TextRanges to the InlineSpan to replace it with.
-    final Map<TextRange, InlineSpan> rangeSpanMapping =
-    <TextRange, InlineSpan>{};
+    final Map<TextRange, InlineSpan> rangeSpanMapping = <TextRange, InlineSpan>{};
 
     // If the composing range is out of range for the current text, ignore it to
     // preserve the tree integrity, otherwise in release mode a RangeError will
     // be thrown and this EditableText will be built with a broken subtree.
     //
     // Add composing region as a replacement to a TextSpan with underline.
-    if (!composingRegionReplaceable &&
-        value.isComposingRangeValid &&
-        withComposing) {
+    if (!composingRegionReplaceable
+        && value.isComposingRangeValid
+        && withComposing) {
       _addToMappingWithOverlaps((String value, TextRange range) {
         final TextStyle composingStyle = style != null
             ? style.merge(const TextStyle(decoration: TextDecoration.underline))
@@ -1542,17 +1836,17 @@ class ReplacementTextEditingController extends TextEditingController {
         );
       }, value.composing, rangeSpanMapping, value.text);
     }
+
     // Iterate through TextEditingInlineSpanReplacements, handling overlapping
     // replacements and mapping them towards a generated InlineSpan.
     if (replacements != null) {
-      for (final TextEditingInlineSpanReplacement replacement
-      in replacements!) {
+      for (final TextEditingInlineSpanReplacement replacement in replacements!) {
         _addToMappingWithOverlaps(
-            replacement.generator,
-            TextRange(
-                start: replacement.range.start, end: replacement.range.end),
-            rangeSpanMapping,
-            value.text);
+          replacement.generator,
+          TextRange(start: replacement.range.start, end: replacement.range.end),
+          rangeSpanMapping,
+          value.text,
+        );
       }
     }
 
@@ -1561,9 +1855,9 @@ class ReplacementTextEditingController extends TextEditingController {
     // be thrown and this EditableText will be built with a broken subtree.
     //
     // Add composing region as a replacement to a TextSpan with underline.
-    if (composingRegionReplaceable &&
-        value.isComposingRangeValid &&
-        withComposing) {
+    if (composingRegionReplaceable
+        && value.isComposingRangeValid
+        && withComposing) {
       _addToMappingWithOverlaps((String value, TextRange range) {
         final TextStyle composingStyle = style != null
             ? style.merge(const TextStyle(decoration: TextDecoration.underline))
@@ -1574,17 +1868,18 @@ class ReplacementTextEditingController extends TextEditingController {
         );
       }, value.composing, rangeSpanMapping, value.text);
     }
+
     // Sort the matches by start index. Since no overlapping exists, this is safe.
     final List<TextRange> sortedRanges = rangeSpanMapping.keys.toList();
     sortedRanges.sort((TextRange a, TextRange b) => a.start.compareTo(b.start));
+
     // Create TextSpans for non-replaced text ranges and insert the replacements spans
     // for any ranges that are marked to be replaced.
     final List<InlineSpan> spans = <InlineSpan>[];
     int previousEndIndex = 0;
     for (final TextRange range in sortedRanges) {
       if (range.start > previousEndIndex) {
-        spans.add(TextSpan(
-            text: value.text.substring(previousEndIndex, range.start)));
+        spans.add(TextSpan(text: value.text.substring(previousEndIndex, range.start)));
       }
       spans.add(rangeSpanMapping[range]!);
       previousEndIndex = range.end;
@@ -1609,43 +1904,240 @@ class ReplacementTextEditingController extends TextEditingController {
     // For example in the case of two TextSpans matching the same range for replacement,
     // we should try to merge the styles into one TextStyle and build a new TextSpan.
     bool overlap = false;
+    List<TextRange> overlapRanges = <TextRange>[];
     for (final TextRange range in rangeSpanMapping.keys) {
-      // Check if we have overlapping replacements.
-      if (matchedRange.start >= range.start && matchedRange.start < range.end ||
-          matchedRange.end > range.start && matchedRange.end <= range.end ||
-          matchedRange.start < range.start && matchedRange.end > range.end) {
+      if (math.max(matchedRange.start, range.start)
+          <= math.min(matchedRange.end, range.end)) {
         overlap = true;
-        break;
+        overlapRanges.add(range);
       }
     }
 
+    final List<List<dynamic>> overlappingTriples = <List<dynamic>>[];
+
     if (overlap) {
-      InlineSpan? generatedReplacement =
-      generator(matchedRange.textInside(text), matchedRange);
-      InlineSpan? previousGeneratedReplacement = rangeSpanMapping[matchedRange];
+      overlappingTriples.add([matchedRange.start, matchedRange.end, generator(matchedRange.textInside(text), matchedRange).style]);
 
-      if (previousGeneratedReplacement is TextSpan &&
-          generatedReplacement is TextSpan) {
-        TextSpan? generatedReplacementTextSpan =
-        generatedReplacement;
-        TextSpan? previousGeneratedReplacementTextSpan =
-        previousGeneratedReplacement;
-        TextStyle? genRepStyle = generatedReplacementTextSpan.style;
-        TextStyle? prevRepStyle = previousGeneratedReplacementTextSpan.style;
-        String? text = generatedReplacementTextSpan.text;
+      for (final TextRange overlappingRange in overlapRanges) {
+        overlappingTriples.add([overlappingRange.start, overlappingRange.end, rangeSpanMapping[overlappingRange]!.style]);
+        rangeSpanMapping.remove(overlappingRange);
+      }
 
-        if (text != null && genRepStyle != null && prevRepStyle != null) {
-          final TextStyle mergedReplacementStyle =
-          genRepStyle.merge(prevRepStyle);
-          rangeSpanMapping[matchedRange] =
-              TextSpan(text: text, style: mergedReplacementStyle);
+      final List<dynamic> toRemoveRangesThatHaveBeenMerged = [];
+      final List<dynamic> toAddRangesThatHaveBeenMerged = [];
+      for (int i = 0; i < overlappingTriples.length; i++) {
+        List<dynamic> tripleA = overlappingTriples[i];
+        if (toRemoveRangesThatHaveBeenMerged.contains(tripleA)) continue;
+        for (int j = i + 1; j < overlappingTriples.length; j++) {
+          final List<dynamic> tripleB = overlappingTriples[j];
+          if (math.max(tripleA[0] as int, tripleB[0] as int)
+              <= math.min(tripleB[1] as int, tripleB[1] as int)
+              && tripleA[2] == tripleB[2]) {
+            toRemoveRangesThatHaveBeenMerged.addAll([tripleA, tripleB]);
+            tripleA = [
+              math.min(tripleA[0] as int, tripleB[0] as int),
+              math.max(tripleA[1] as int, tripleB[1] as int),
+              tripleA[2],
+            ];
+          }
         }
+
+        if (i != overlappingTriples.length - 1
+            && !toAddRangesThatHaveBeenMerged.contains(tripleA)
+            && !toRemoveRangesThatHaveBeenMerged.contains(tripleA)) {
+          toAddRangesThatHaveBeenMerged.add(tripleA);
+        }
+      }
+
+      for (final List<dynamic> tripleToRemove in toRemoveRangesThatHaveBeenMerged) {
+        overlappingTriples.remove(tripleToRemove);
+      }
+
+      for (final List<dynamic> tripleToAdd in toAddRangesThatHaveBeenMerged) {
+        overlappingTriples.add(tripleToAdd);
+      }
+
+      List<int> endPoints = <int>[];
+      for (List<dynamic> triple in overlappingTriples) {
+        Set<int> ends = <int>{};
+        ends.add(triple[0]);
+        ends.add(triple[1]);
+        endPoints.addAll(ends.toList());
+      }
+      endPoints.sort();
+      Map<int, Set<TextStyle>> start = <int, Set<TextStyle>>{};
+      Map<int, Set<TextStyle>> end = <int, Set<TextStyle>>{};
+
+      for (final int e in endPoints) {
+        start[e] = <TextStyle>{};
+        end[e] = <TextStyle>{};
+      }
+
+      for (List<dynamic> triple in overlappingTriples) {
+        start[triple[0]]!.add(triple[2]);
+        end[triple[1]]!.add(triple[2]);
+      }
+
+      Set<TextStyle> styles = <TextStyle>{};
+      List<int> otherEndPoints = endPoints.getRange(1, endPoints.length).toList();
+      for (int i = 0; i < endPoints.length - 1; i++) {
+        styles = styles.difference(end[endPoints[i]]!);
+        styles.addAll(start[endPoints[i]]!);
+        TextStyle? mergedStyles;
+        final TextRange uniqueRange = TextRange(
+            start: endPoints[i],
+            end: otherEndPoints[i]
+        );
+        for (final TextStyle style in styles) {
+          if (mergedStyles == null) {
+            mergedStyles = style;
+          } else {
+            mergedStyles = mergedStyles.merge(style);
+          }
+        }
+        rangeSpanMapping[uniqueRange] = TextSpan(
+            text: uniqueRange.textInside(text),
+            style: mergedStyles
+        );
       }
     }
 
     if (!overlap) {
       rangeSpanMapping[matchedRange] =
           generator(matchedRange.textInside(text), matchedRange);
+    }
+
+    // Clean up collapsed ranges that we don't need to style.
+    final List<TextRange> toRemove = <TextRange>[];
+
+    for (final TextRange range in rangeSpanMapping.keys) {
+      if (range.isCollapsed) toRemove.add(range);
+    }
+
+    for (final TextRange range in toRemove) {
+      rangeSpanMapping.remove(range);
+    }
+  }
+
+  void disableExpand(TextStyle style) {
+    final List<TextEditingInlineSpanReplacement> toRemove = [];
+    final List<TextEditingInlineSpanReplacement> toAdd = [];
+
+    for (final TextEditingInlineSpanReplacement replacement in replacements!) {
+      if (replacement.range.end == selection.start) {
+        TextStyle? replacementStyle =
+            (replacement.generator('', const TextRange.collapsed(0)) as TextSpan).style;
+        if (replacementStyle! == style) {
+          toRemove.add(replacement);
+          toAdd.add(replacement.copy(expand: false));
+        }
+      }
+    }
+
+    for (final TextEditingInlineSpanReplacement replacementToRemove in toRemove) {
+      replacements!.remove(replacementToRemove);
+    }
+
+    for (final TextEditingInlineSpanReplacement replacementWithExpandDisabled in toAdd) {
+      replacements!.add(replacementWithExpandDisabled);
+    }
+  }
+
+  List<TextStyle> getReplacementsAtSelection(TextSelection selection) {
+    // [left replacement]|[right replacement], only left replacement should be
+    // reported.
+    //
+    // Selection of a range of replacements should only enable the replacements
+    // common to the selection. If there are no common replacements then none
+    // should be enabled.
+    final List<TextStyle> stylesAtSelection = <TextStyle>[];
+
+    for (final TextEditingInlineSpanReplacement replacement in replacements!) {
+      if (selection.isCollapsed) {
+        if (math.max(replacement.range.start, selection.start)
+            <= math.min(replacement.range.end, selection.end)) {
+          if (selection.end != replacement.range.start) {
+            if (selection.start == replacement.range.end) {
+              if (replacement.expand) {
+                stylesAtSelection.add(replacement
+                    .generator('', replacement.range)
+                    .style!);
+              }
+            } else {
+              stylesAtSelection.add(replacement
+                  .generator('', replacement.range)
+                  .style!);
+            }
+          }
+        }
+      } else {
+        if (math.max(replacement.range.start, selection.start)
+            <= math.min(replacement.range.end, selection.end)) {
+          if (replacement.range.start <= selection.start &&
+              replacement.range.end >= selection.end) {
+            stylesAtSelection.add(replacement
+                .generator('', replacement.range)
+                .style!);
+          }
+        }
+      }
+    }
+
+    return stylesAtSelection;
+  }
+
+  void removeReplacementsAtRange(TextRange removalRange, TextStyle? attribute) {
+    final List<TextEditingInlineSpanReplacement> toRemove = [];
+    final List<TextEditingInlineSpanReplacement> toAdd = [];
+
+    for (TextEditingInlineSpanReplacement replacement in replacements!) {
+      InlineSpan replacementSpan = replacement.generator('', const TextRange.collapsed(0));
+      TextStyle? replacementStyle = replacementSpan.style;
+
+      if ((math.max(replacement.range.start, removalRange.start)
+          <= math.min(replacement.range.end, removalRange.end))
+          && replacementStyle != null) {
+        if (replacementStyle == attribute!) {
+          // if removal range encompasses entire replacement, then remove
+          // replacement without splitting ranges.
+          final bool removalRangeCoversReplacement = removalRange.start <= replacement.range.start
+              && removalRange.end >= replacement.range.end;
+
+          toRemove.add(replacement);
+
+          final TextRange rangeSplitStart = TextRange(
+            start: math.min(replacement.range.start, removalRange.start),
+            end: math.max(replacement.range.start, removalRange.start),
+          );
+          final TextRange rangeSplitEnd = TextRange(
+            start: math.min(replacement.range.end, removalRange.end),
+            end: math.max(replacement.range.end, removalRange.end),
+          );
+
+          final bool removalRangeIsRangeSplitStart = removalRange == rangeSplitStart;
+          final bool removalRangeIsRangeSplitEnd = removalRange == rangeSplitEnd;
+
+          if (!rangeSplitStart.isCollapsed
+              && !removalRangeCoversReplacement
+              && !removalRangeIsRangeSplitStart) {
+            toAdd.add(replacement.copy(range: rangeSplitStart, expand: !removalRange.isCollapsed));
+          }
+
+          if (!rangeSplitEnd.isCollapsed
+              && !removalRangeCoversReplacement
+              && !removalRangeIsRangeSplitEnd) {
+            toAdd.add(replacement.copy(range: rangeSplitEnd));
+          }
+        }
+      }
+    }
+
+    for (TextEditingInlineSpanReplacement replacementToAdd in toAdd) {
+      replacements!.add(replacementToAdd);
+    }
+
+    for (TextEditingInlineSpanReplacement replacementToRemove in toRemove) {
+      replacements!.remove(replacementToRemove);
     }
   }
 }

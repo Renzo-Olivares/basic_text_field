@@ -181,11 +181,6 @@ class _MyHomePageState extends State<MyHomePage> {
               children: [
                 ToggleButtons(
                   borderRadius: const BorderRadius.all(Radius.circular(4.0)),
-                  children: const [
-                    Icon(Icons.format_bold),
-                    Icon(Icons.format_italic),
-                    Icon(Icons.format_underline),
-                  ],
                   isSelected: _isSelected,
                   onPressed: (int index) {
                     Map<int, TextStyle> attributeMap = const <int, TextStyle>{
@@ -215,6 +210,11 @@ class _MyHomePageState extends State<MyHomePage> {
                       setState(() {});
                     }
                   },
+                  children: const [
+                    Icon(Icons.format_bold),
+                    Icon(Icons.format_italic),
+                    Icon(Icons.format_underline),
+                  ],
                 ),
               ],
             ),
