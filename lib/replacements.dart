@@ -340,6 +340,7 @@ class ReplacementTextEditingController extends TextEditingController {
         if (delta.replacedRange.start >= replacement.range.start
             && delta.replacedRange.end <= replacement.range.end) {
           // Update replacement ranges directly inclusively associated with replaced range.
+          print('inclusive replacement');
           final int replacementEndOffset = replacement.range.end;
           final int replacementStartOffset = replacement.range.start;
 
@@ -470,6 +471,8 @@ class ReplacementTextEditingController extends TextEditingController {
               updatedReplacements.add(replacement);
             }
           }
+        } else if (delta.replacedRange.start <= replacement.range.start && delta.replacedRange.end >= replacement.range.end) {
+          toRemove.add(replacement);
         }
       } else if (delta is TextEditingDeltaNonTextUpdate) {
         // Sync non text updates.
