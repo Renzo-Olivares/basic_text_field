@@ -157,11 +157,37 @@ class _MyHomePageState extends State<MyHomePage> {
       padding: const EdgeInsets.symmetric(horizontal: 35.0, vertical: 10.0),
       child: Row(
         children: [
-          Expanded(child: _buildTextEditingDeltaViewHeading('Delta Type')),
-          Expanded(child: _buildTextEditingDeltaViewHeading('Delta Text')),
-          Expanded(child: _buildTextEditingDeltaViewHeading('Delta Offset')),
-          Expanded(child: _buildTextEditingDeltaViewHeading('New Selection')),
-          Expanded(child: _buildTextEditingDeltaViewHeading('New Composing')),
+          Expanded(
+              child: Tooltip(
+                message: 'The type of text input that is occurring.'
+                    ' Check out the documentation for TextEditingDelta for more information.',
+                child: _buildTextEditingDeltaViewHeading('Delta Type'),
+              ),
+          ),
+          Expanded(
+              child: Tooltip(
+                message: 'The text that is being inserted or deleted',
+                child: _buildTextEditingDeltaViewHeading('Delta Text'),
+              ),
+          ),
+          Expanded(
+              child: Tooltip(
+                message: 'The offset in the text where the text input is occurring.',
+                child: _buildTextEditingDeltaViewHeading('Delta Offset'),
+              ),
+          ),
+          Expanded(
+              child: Tooltip(
+                message: 'The new text selection range after the text input has occurred.',
+                child: _buildTextEditingDeltaViewHeading('New Selection'),
+              ),
+          ),
+          Expanded(
+              child: Tooltip(
+                message: 'The new composing range after the text input has occurred.',
+                child: _buildTextEditingDeltaViewHeading('New Composing'),
+              ),
+          ),
         ],
       ),
     );
@@ -176,54 +202,57 @@ class _MyHomePageState extends State<MyHomePage> {
       body: Center(
         child: Column(
           children: [
-            ButtonBar(
-              alignment: MainAxisAlignment.center,
-              children: [
-                ToggleButtons(
-                  borderRadius: const BorderRadius.all(Radius.circular(4.0)),
-                  isSelected: _isSelected,
-                  onPressed: (int index) {
-                    Map<int, TextStyle> attributeMap = const <int, TextStyle>{
-                      0 : TextStyle(fontWeight: FontWeight.bold),
-                      1 : TextStyle(fontStyle: FontStyle.italic),
-                      2 : TextStyle(decoration: TextDecoration.underline),
-                    };
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  ToggleButtons(
+                    borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+                    isSelected: _isSelected,
+                    onPressed: (int index) {
+                      Map<int, TextStyle> attributeMap = const <int, TextStyle>{
+                        0 : TextStyle(fontWeight: FontWeight.bold),
+                        1 : TextStyle(fontStyle: FontStyle.italic),
+                        2 : TextStyle(decoration: TextDecoration.underline),
+                      };
 
-                    final TextRange replacementRange = TextRange(
-                      start: _replacementTextEditingController.selection.start,
-                      end: _replacementTextEditingController.selection.end,
-                    );
-
-                    _isSelected[index] = !_isSelected[index];
-                    if (_isSelected[index]) {
-                      _replacementTextEditingController.applyReplacement(
-                        TextEditingInlineSpanReplacement(
-                          replacementRange,
-                              (string, range) => TextSpan(text: string, style: attributeMap[index]),
-                          true,
-                        ),
+                      final TextRange replacementRange = TextRange(
+                        start: _replacementTextEditingController.selection.start,
+                        end: _replacementTextEditingController.selection.end,
                       );
-                      setState(() {});
-                    } else {
-                      _replacementTextEditingController.disableExpand(attributeMap[index]!);
-                      _replacementTextEditingController.removeReplacementsAtRange(replacementRange, attributeMap[index]);
-                      setState(() {});
-                    }
-                  },
-                  children: const [
-                    Icon(Icons.format_bold),
-                    Icon(Icons.format_italic),
-                    Icon(Icons.format_underline),
-                  ],
-                ),
-              ],
+
+                      _isSelected[index] = !_isSelected[index];
+                      if (_isSelected[index]) {
+                        _replacementTextEditingController.applyReplacement(
+                          TextEditingInlineSpanReplacement(
+                            replacementRange,
+                                (string, range) => TextSpan(text: string, style: attributeMap[index]),
+                            true,
+                          ),
+                        );
+                        setState(() {});
+                      } else {
+                        _replacementTextEditingController.disableExpand(attributeMap[index]!);
+                        _replacementTextEditingController.removeReplacementsAtRange(replacementRange, attributeMap[index]);
+                        setState(() {});
+                      }
+                    },
+                    children: const [
+                      Icon(Icons.format_bold),
+                      Icon(Icons.format_italic),
+                      Icon(Icons.format_underline),
+                    ],
+                  ),
+                ],
+              ),
             ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 35.0),
                 child: BasicTextField(
                   controller: _replacementTextEditingController,
-                  style: const TextStyle(color: Colors.black),
+                  style: const TextStyle(fontSize: 18.0, color: Colors.black),
                   focusNode: _focusNode,
                   updateToggleButtonStateOnSelectionChanged: _updateToggleButtonStateOnSelectionChanged,
                   updateTextEditingDeltaHistory: _updateTextEditingDeltaHistory,
@@ -242,7 +271,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       },
                       itemCount: _textEditingDeltaHistory.length,
                       separatorBuilder: (BuildContext context, int index) {
-                        return const Divider(height: 5.0);
+                        return const SizedBox(height: 2.0);
                       },
                     ),
                   ),
@@ -279,16 +308,16 @@ class TextEditingDeltaView extends StatelessWidget {
 
     switch (deltaType) {
       case 'Insertion':
-        rowColor = Colors.greenAccent;
+        rowColor = Colors.greenAccent.shade100;
         break;
       case 'Deletion':
-        rowColor = Colors.redAccent;
+        rowColor = Colors.redAccent.shade100;
         break;
       case 'Replacement':
-        rowColor = Colors.yellowAccent;
+        rowColor = Colors.yellowAccent.shade100;
         break;
       case 'NonTextUpdate':
-        rowColor = Colors.blueAccent;
+        rowColor = Colors.blueAccent.shade100;
         break;
       default:
         rowColor = Colors.white;

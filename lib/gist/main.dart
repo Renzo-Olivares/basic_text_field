@@ -160,11 +160,37 @@ class _MyHomePageState extends State<MyHomePage> {
       padding: const EdgeInsets.symmetric(horizontal: 35.0, vertical: 10.0),
       child: Row(
         children: [
-          Expanded(child: _buildTextEditingDeltaViewHeading('Delta Type')),
-          Expanded(child: _buildTextEditingDeltaViewHeading('Delta Text')),
-          Expanded(child: _buildTextEditingDeltaViewHeading('Delta Offset')),
-          Expanded(child: _buildTextEditingDeltaViewHeading('New Selection')),
-          Expanded(child: _buildTextEditingDeltaViewHeading('New Composing')),
+          Expanded(
+            child: Tooltip(
+              message: 'The type of text input that is occurring.'
+                  ' Check out the documentation for TextEditingDelta for more information.',
+              child: _buildTextEditingDeltaViewHeading('Delta Type'),
+            ),
+          ),
+          Expanded(
+            child: Tooltip(
+              message: 'The text that is being inserted or deleted',
+              child: _buildTextEditingDeltaViewHeading('Delta Text'),
+            ),
+          ),
+          Expanded(
+            child: Tooltip(
+              message: 'The offset in the text where the text input is occurring.',
+              child: _buildTextEditingDeltaViewHeading('Delta Offset'),
+            ),
+          ),
+          Expanded(
+            child: Tooltip(
+              message: 'The new text selection range after the text input has occurred.',
+              child: _buildTextEditingDeltaViewHeading('New Selection'),
+            ),
+          ),
+          Expanded(
+            child: Tooltip(
+              message: 'The new composing range after the text input has occurred.',
+              child: _buildTextEditingDeltaViewHeading('New Composing'),
+            ),
+          ),
         ],
       ),
     );
@@ -282,16 +308,16 @@ class TextEditingDeltaView extends StatelessWidget {
 
     switch (deltaType) {
       case 'Insertion':
-        rowColor = Colors.greenAccent;
+        rowColor = Colors.greenAccent.shade100;
         break;
       case 'Deletion':
-        rowColor = Colors.redAccent;
+        rowColor = Colors.redAccent.shade100;
         break;
       case 'Replacement':
-        rowColor = Colors.yellowAccent;
+        rowColor = Colors.yellowAccent.shade100;
         break;
       case 'NonTextUpdate':
-        rowColor = Colors.blueAccent;
+        rowColor = Colors.blueAccent.shade100;
         break;
       default:
         rowColor = Colors.white;
@@ -1113,7 +1139,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
                   value: _value, // We pass value.selection to RenderEditable.
                   cursorColor: Colors.blue,
                   backgroundCursorColor: Colors.grey[100],
-                  showCursor: ValueNotifier<bool>(true),
+                  showCursor: ValueNotifier<bool>(_hasFocus),
                   forceLine: true, // Whether text field will take full line regardless of width.
                   readOnly: false, // editable text-field.
                   hasFocus: _hasFocus,

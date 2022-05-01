@@ -636,7 +636,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
                   value: _value, // We pass value.selection to RenderEditable.
                   cursorColor: Colors.blue,
                   backgroundCursorColor: Colors.grey[100],
-                  showCursor: ValueNotifier<bool>(true),
+                  showCursor: ValueNotifier<bool>(_hasFocus),
                   forceLine: true, // Whether text field will take full line regardless of width.
                   readOnly: false, // editable text-field.
                   hasFocus: _hasFocus,
