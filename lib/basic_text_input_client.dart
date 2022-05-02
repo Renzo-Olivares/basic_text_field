@@ -1,5 +1,5 @@
 import 'dart:math' as math;
-import 'package:deltaclientguide/basic_text_field.dart';
+import 'package:deltaclientguide/main.dart';
 import 'package:deltaclientguide/replacements.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -23,7 +23,6 @@ class BasicTextInputClient extends StatefulWidget {
     this.selectionControls,
     required this.onSelectionChanged,
     required this.showSelectionHandles,
-    this.updateTextEditingDeltaHistory,
   }) : super(key: key);
 
   final TextEditingController controller;
@@ -32,7 +31,6 @@ class BasicTextInputClient extends StatefulWidget {
   final TextSelectionControls? selectionControls;
   final bool showSelectionHandles;
   final SelectionChangedCallback onSelectionChanged;
-  final TextEditingDeltaHistoryUpdateCallback? updateTextEditingDeltaHistory;
 
   @override
   State<BasicTextInputClient> createState() => BasicTextInputClientState();
@@ -41,6 +39,8 @@ class BasicTextInputClient extends StatefulWidget {
 class BasicTextInputClientState extends State<BasicTextInputClient>
     with TextSelectionDelegate implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
+  late final ToggleButtonsStateManager toggleButtonStateManager;
+  late final TextEditingDeltaHistoryManager textEditingDeltaHistoryManager;
   final ClipboardStatusNotifier? _clipboardStatus = kIsWeb ? null : ClipboardStatusNotifier();
 
   @override
@@ -48,6 +48,13 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     super.initState();
     widget.focusNode.addListener(_handleFocusChanged);
     widget.controller.addListener(_didChangeTextEditingValue);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    toggleButtonStateManager = ToggleButtonsStateManager.of(context);
+    textEditingDeltaHistoryManager = TextEditingDeltaHistoryManager.of(context);
   }
 
   @override
@@ -134,8 +141,8 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
       return;
     }
 
-    final bool selectionChanged = _value.selection != value.selection;
-    widget.updateTextEditingDeltaHistory?.call(textEditingDeltas);
+    final bool selectionChanged = _value.selection.start != value.selection.start || _value.selection.end != value.selection.end;
+    textEditingDeltaHistoryManager.updateTextEditingDeltaHistoryOnInput(textEditingDeltas);
 
     _value = value;
 
@@ -145,7 +152,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
       }
     }
 
-    if (selectionChanged) widget.onSelectionChanged(value.selection, SelectionChangedCause.keyboard);
+    if (selectionChanged) {
+      toggleButtonStateManager.updateToggleButtonsOnSelection(value.selection);
+    }
   }
 
   @override
@@ -235,7 +244,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     if (_hasFocus) {
       if (!_value.selection.isValid) {
         // Place cursor at the end if the selection is invalid when we receive focus.
-        _handleSelectionChanged(TextSelection.collapsed(offset: _value.text.length), null);
+        final TextSelection validSelection = TextSelection.collapsed(offset: _value.text.length);
+        _handleSelectionChanged(validSelection, null);
+        toggleButtonStateManager.updateToggleButtonsOnSelection(validSelection);
       }
     }
   }
@@ -261,7 +272,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     }
 
     if (value != _value) {
-      widget.updateTextEditingDeltaHistory?.call([textEditingDelta]);
+      textEditingDeltaHistoryManager.updateTextEditingDeltaHistoryOnInput([textEditingDelta]);
     }
 
     userUpdateTextEditingValue(value, cause);
@@ -519,13 +530,22 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
             selection: value.selection,
             composing: value.composing,
         );
-        widget.updateTextEditingDeltaHistory?.call([selectionUpdate]);
+        textEditingDeltaHistoryManager.updateTextEditingDeltaHistoryOnInput([selectionUpdate]);
       }
     }
 
     _value = value;
 
-    if (selectionChanged) _handleSelectionChanged(_value.selection, cause);
+    if (selectionChanged) {
+      _handleSelectionChanged(_value.selection, cause);
+
+      final bool selectionRangeChanged = _value.selection.start != value.selection.start
+          || _value.selection.end != value.selection.end;
+
+      if (selectionRangeChanged) {
+        toggleButtonStateManager.updateToggleButtonsOnSelection(_value.selection);
+      }
+    }
   }
 
   /// For TextSelection.

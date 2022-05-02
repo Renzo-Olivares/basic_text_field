@@ -1,12 +1,8 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart' show TextEditingDelta;
 
 import 'basic_text_input_client.dart';
-
-typedef AnySelectionChangedCallback = void Function(TextSelection selection);
-typedef TextEditingDeltaHistoryUpdateCallback = void Function(List<TextEditingDelta> textEditingDeltas);
 
 /// A basic text field. Defines the appearance of a basic text input client.
 class BasicTextField extends StatefulWidget {
@@ -15,15 +11,11 @@ class BasicTextField extends StatefulWidget {
     required this.controller,
     required this.style,
     required this.focusNode,
-    this.updateToggleButtonStateOnSelectionChanged,
-    this.updateTextEditingDeltaHistory,
   }) : super(key: key);
 
   final TextEditingController controller;
   final TextStyle style;
   final FocusNode focusNode;
-  final AnySelectionChangedCallback? updateToggleButtonStateOnSelectionChanged;
-  final TextEditingDeltaHistoryUpdateCallback? updateTextEditingDeltaHistory;
 
   @override
   State<BasicTextField> createState() => _BasicTextFieldState();
@@ -68,10 +60,6 @@ class _BasicTextFieldState extends State<BasicTextField> {
       setState(() {
         _showSelectionHandles = willShowSelectionHandles;
       });
-    }
-
-    if (cause != null) {
-      widget.updateToggleButtonStateOnSelectionChanged?.call(selection);
     }
   }
 
@@ -166,7 +154,6 @@ class _BasicTextFieldState extends State<BasicTextField> {
               selectionControls: _textSelectionControls,
               onSelectionChanged: _handleSelectionChanged,
               showSelectionHandles: _showSelectionHandles,
-              updateTextEditingDeltaHistory: widget.updateTextEditingDeltaHistory,
             ),
           ),
         ),

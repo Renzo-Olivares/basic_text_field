@@ -40,9 +40,19 @@ class _MyHomePageState extends State<MyHomePage> {
   );
   final FocusNode _focusNode = FocusNode();
   final List<bool> _isSelected = [false, false, false];
-  final List<Widget> _textEditingDeltaHistory = [];
+  final List<TextEditingDelta> _textEditingDeltaHistory = [];
 
   void _updateTextEditingDeltaHistory(List<TextEditingDelta> textEditingDeltas) {
+    for (final TextEditingDelta delta in textEditingDeltas) {
+      _textEditingDeltaHistory.add(delta);
+    }
+
+    setState(() {});
+  }
+
+  List<Widget> _buildTextEditingDeltaHistoryViews(List<TextEditingDelta> textEditingDeltas) {
+    List<Widget> _textEditingDeltaViews = [];
+
     for (final TextEditingDelta delta in textEditingDeltas) {
       final TextEditingDeltaView deltaView;
 
@@ -88,13 +98,13 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       }
 
-      _textEditingDeltaHistory.add(deltaView);
+      _textEditingDeltaViews.add(deltaView);
     }
 
-    setState(() {});
+    return _textEditingDeltaViews.reversed.toList();
   }
 
-  void _updateToggleButtonStateOnSelectionChanged(TextSelection selection) {
+  void _updateToggleButtonsStateOnSelectionChanged(TextSelection selection) {
     // When the selection changes we want to check the replacements at the new
     // selection. Enable/disable toggle buttons based on the replacements found
     // at the new selection.
@@ -140,6 +150,35 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     setState(() {});
+  }
+
+  void _updateToggleButtonsStateOnButtonPressed(int index) {
+    Map<int, TextStyle> attributeMap = const <int, TextStyle>{
+      0 : TextStyle(fontWeight: FontWeight.bold),
+      1 : TextStyle(fontStyle: FontStyle.italic),
+      2 : TextStyle(decoration: TextDecoration.underline),
+    };
+
+    final TextRange replacementRange = TextRange(
+      start: _replacementTextEditingController.selection.start,
+      end: _replacementTextEditingController.selection.end,
+    );
+
+    _isSelected[index] = !_isSelected[index];
+    if (_isSelected[index]) {
+      _replacementTextEditingController.applyReplacement(
+        TextEditingInlineSpanReplacement(
+          replacementRange,
+              (string, range) => TextSpan(text: string, style: attributeMap[index]),
+          true,
+        ),
+      );
+      setState(() {});
+    } else {
+      _replacementTextEditingController.disableExpand(attributeMap[index]!);
+      _replacementTextEditingController.removeReplacementsAtRange(replacementRange, attributeMap[index]);
+      setState(() {});
+    }
   }
 
   Widget _buildTextEditingDeltaViewHeading(String text) {
@@ -200,86 +239,91 @@ class _MyHomePageState extends State<MyHomePage> {
         title: Text(widget.title),
       ),
       body: Center(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  ToggleButtons(
-                    borderRadius: const BorderRadius.all(Radius.circular(4.0)),
-                    isSelected: _isSelected,
-                    onPressed: (int index) {
-                      Map<int, TextStyle> attributeMap = const <int, TextStyle>{
-                        0 : TextStyle(fontWeight: FontWeight.bold),
-                        1 : TextStyle(fontStyle: FontStyle.italic),
-                        2 : TextStyle(decoration: TextDecoration.underline),
-                      };
+        child: ToggleButtonsStateManager(
+          isToggleButtonsSelected: _isSelected,
+          updateToggleButtonsStateOnButtonPressed: _updateToggleButtonsStateOnButtonPressed,
+          updateToggleButtonStateOnSelectionChanged: _updateToggleButtonsStateOnSelectionChanged,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    ToggleButtonsStateManager(
+                      isToggleButtonsSelected: _isSelected,
+                      updateToggleButtonsStateOnButtonPressed: _updateToggleButtonsStateOnButtonPressed,
+                      updateToggleButtonStateOnSelectionChanged: _updateToggleButtonsStateOnSelectionChanged,
+                      child: Builder(
+                        builder: (BuildContext innerContext) {
+                          final ToggleButtonsStateManager manager = ToggleButtonsStateManager.of(innerContext);
 
-                      final TextRange replacementRange = TextRange(
-                        start: _replacementTextEditingController.selection.start,
-                        end: _replacementTextEditingController.selection.end,
-                      );
-
-                      _isSelected[index] = !_isSelected[index];
-                      if (_isSelected[index]) {
-                        _replacementTextEditingController.applyReplacement(
-                          TextEditingInlineSpanReplacement(
-                            replacementRange,
-                                (string, range) => TextSpan(text: string, style: attributeMap[index]),
-                            true,
-                          ),
-                        );
-                        setState(() {});
-                      } else {
-                        _replacementTextEditingController.disableExpand(attributeMap[index]!);
-                        _replacementTextEditingController.removeReplacementsAtRange(replacementRange, attributeMap[index]);
-                        setState(() {});
-                      }
-                    },
-                    children: const [
-                      Icon(Icons.format_bold),
-                      Icon(Icons.format_italic),
-                      Icon(Icons.format_underline),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 35.0),
-                child: BasicTextField(
-                  controller: _replacementTextEditingController,
-                  style: const TextStyle(fontSize: 18.0, color: Colors.black),
-                  focusNode: _focusNode,
-                  updateToggleButtonStateOnSelectionChanged: _updateToggleButtonStateOnSelectionChanged,
-                  updateTextEditingDeltaHistory: _updateTextEditingDeltaHistory,
+                          return ToggleButtons(
+                            borderRadius: const BorderRadius.all(Radius.circular(4.0)),
+                            isSelected: manager.toggleButtonsState,
+                            onPressed: (int index) => manager.updateToggleButtonsOnButtonPressed(index),
+                            children: const [
+                              Icon(Icons.format_bold),
+                              Icon(Icons.format_italic),
+                              Icon(Icons.format_underline),
+                            ],
+                          );
+                        }
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            Expanded(
-              child: Column(
-                children: [
-                  _buildTextEditingDeltaViewHeader(),
-                  Expanded(
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 35.0),
-                      itemBuilder: (BuildContext context, int index) {
-                        return _textEditingDeltaHistory.reversed.toList()[index];
-                      },
-                      itemCount: _textEditingDeltaHistory.length,
-                      separatorBuilder: (BuildContext context, int index) {
-                        return const SizedBox(height: 2.0);
-                      },
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 35.0),
+                  child: ToggleButtonsStateManager(
+                    isToggleButtonsSelected: _isSelected,
+                    updateToggleButtonsStateOnButtonPressed: _updateToggleButtonsStateOnButtonPressed,
+                    updateToggleButtonStateOnSelectionChanged: _updateToggleButtonsStateOnSelectionChanged,
+                    child: TextEditingDeltaHistoryManager(
+                      history: _textEditingDeltaHistory,
+                      updateHistoryOnInput: _updateTextEditingDeltaHistory,
+                      child: BasicTextField(
+                        controller: _replacementTextEditingController,
+                        style: const TextStyle(fontSize: 18.0, color: Colors.black),
+                        focusNode: _focusNode,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                ],
+                ),
               ),
-            ),
-          ],
+              Expanded(
+                child: Column(
+                  children: [
+                    _buildTextEditingDeltaViewHeader(),
+                    Expanded(
+                      child: TextEditingDeltaHistoryManager(
+                        history: _textEditingDeltaHistory,
+                        updateHistoryOnInput: _updateTextEditingDeltaHistory,
+                        child: Builder(
+                          builder: (BuildContext innerContext) {
+                            final TextEditingDeltaHistoryManager manager = TextEditingDeltaHistoryManager.of(innerContext);
+                            return ListView.separated(
+                              padding: const EdgeInsets.symmetric(horizontal: 35.0),
+                              itemBuilder: (BuildContext context, int index) {
+                                return _buildTextEditingDeltaHistoryViews(manager.textEditingDeltaHistory)[index];
+                              },
+                              itemCount: manager.textEditingDeltaHistory.length,
+                              separatorBuilder: (BuildContext context, int index) {
+                                return const SizedBox(height: 2.0);
+                              },
+                            );
+                          }
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -337,5 +381,71 @@ class TextEditingDeltaView extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+typedef UpdateToggleButtonsStateOnSelectionChangedCallback = void Function(TextSelection selection);
+typedef UpdateToggleButtonsStateOnButtonPressedCallback = void Function(int index);
+
+class ToggleButtonsStateManager extends InheritedWidget {
+  const ToggleButtonsStateManager({
+    Key? key,
+    required Widget child,
+    required List<bool> isToggleButtonsSelected,
+    required UpdateToggleButtonsStateOnButtonPressedCallback updateToggleButtonsStateOnButtonPressed,
+    required UpdateToggleButtonsStateOnSelectionChangedCallback updateToggleButtonStateOnSelectionChanged,
+  })
+      : _isToggleButtonsSelected = isToggleButtonsSelected,
+        _updateToggleButtonsStateOnButtonPressed = updateToggleButtonsStateOnButtonPressed,
+        _updateToggleButtonStateOnSelectionChanged = updateToggleButtonStateOnSelectionChanged,
+        super(key: key, child: child);
+
+  static ToggleButtonsStateManager of(BuildContext context) {
+    final ToggleButtonsStateManager? result = context.dependOnInheritedWidgetOfExactType<ToggleButtonsStateManager>();
+    assert(result != null, 'No ToggleButtonsStateManager found in context');
+    return result!;
+  }
+
+  final List<bool> _isToggleButtonsSelected;
+  final UpdateToggleButtonsStateOnButtonPressedCallback _updateToggleButtonsStateOnButtonPressed;
+  final UpdateToggleButtonsStateOnSelectionChangedCallback _updateToggleButtonStateOnSelectionChanged;
+
+  List<bool> get toggleButtonsState => _isToggleButtonsSelected;
+  UpdateToggleButtonsStateOnButtonPressedCallback get updateToggleButtonsOnButtonPressed => _updateToggleButtonsStateOnButtonPressed;
+  UpdateToggleButtonsStateOnSelectionChangedCallback get updateToggleButtonsOnSelection => _updateToggleButtonStateOnSelectionChanged;
+
+  @override
+  bool updateShouldNotify(ToggleButtonsStateManager oldWidget) =>
+      toggleButtonsState != oldWidget.toggleButtonsState;
+}
+
+typedef TextEditingDeltaHistoryUpdateCallback = void Function(List<TextEditingDelta> textEditingDeltas);
+
+class TextEditingDeltaHistoryManager extends InheritedWidget {
+  const TextEditingDeltaHistoryManager({
+    Key? key,
+    required Widget child,
+    required List<TextEditingDelta> history,
+    required TextEditingDeltaHistoryUpdateCallback updateHistoryOnInput,
+  })
+      : _textEditingDeltaHistory = history,
+        _updateTextEditingDeltaHistoryOnInput = updateHistoryOnInput,
+        super(key: key, child: child);
+
+  static TextEditingDeltaHistoryManager of(BuildContext context) {
+    final TextEditingDeltaHistoryManager? result = context.dependOnInheritedWidgetOfExactType<TextEditingDeltaHistoryManager>();
+    assert(result != null, 'No ToggleButtonsStateManager found in context');
+    return result!;
+  }
+
+  final List<TextEditingDelta> _textEditingDeltaHistory;
+  final TextEditingDeltaHistoryUpdateCallback _updateTextEditingDeltaHistoryOnInput;
+
+  List<TextEditingDelta> get textEditingDeltaHistory => _textEditingDeltaHistory;
+  TextEditingDeltaHistoryUpdateCallback get updateTextEditingDeltaHistoryOnInput => _updateTextEditingDeltaHistoryOnInput;
+
+  @override
+  bool updateShouldNotify(TextEditingDeltaHistoryManager oldWidget) {
+    return textEditingDeltaHistory != oldWidget.textEditingDeltaHistory;
   }
 }
