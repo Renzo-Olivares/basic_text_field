@@ -534,13 +534,13 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
       }
     }
 
+    final bool selectionRangeChanged = _value.selection.start != value.selection.start
+        || _value.selection.end != value.selection.end;
+
     _value = value;
 
     if (selectionChanged) {
       _handleSelectionChanged(_value.selection, cause);
-
-      final bool selectionRangeChanged = _value.selection.start != value.selection.start
-          || _value.selection.end != value.selection.end;
 
       if (selectionRangeChanged) {
         toggleButtonStateManager.updateToggleButtonsOnSelection(_value.selection);
