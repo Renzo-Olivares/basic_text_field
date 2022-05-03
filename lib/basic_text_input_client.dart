@@ -1,6 +1,5 @@
 import 'dart:math' as math;
 import 'package:deltaclientguide/main.dart';
-import 'package:deltaclientguide/replacements.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -39,7 +38,6 @@ class BasicTextInputClient extends StatefulWidget {
 class BasicTextInputClientState extends State<BasicTextInputClient>
     with TextSelectionDelegate implements DeltaTextInputClient {
   final GlobalKey _textKey = GlobalKey();
-  late final ToggleButtonsStateManager toggleButtonStateManager;
   late final TextEditingDeltaHistoryManager textEditingDeltaHistoryManager;
   final ClipboardStatusNotifier? _clipboardStatus = kIsWeb ? null : ClipboardStatusNotifier();
 
@@ -53,7 +51,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    toggleButtonStateManager = ToggleButtonsStateManager.of(context);
     textEditingDeltaHistoryManager = TextEditingDeltaHistoryManager.of(context);
   }
 
@@ -141,20 +138,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
       return;
     }
 
-    final bool selectionChanged = _value.selection.start != value.selection.start || _value.selection.end != value.selection.end;
     textEditingDeltaHistoryManager.updateTextEditingDeltaHistoryOnInput(textEditingDeltas);
 
     _value = value;
-
-    if (widget.controller is ReplacementTextEditingController) {
-      for (final TextEditingDelta delta in textEditingDeltas) {
-        (widget.controller as ReplacementTextEditingController).syncReplacementRanges(delta);
-      }
-    }
-
-    if (selectionChanged) {
-      toggleButtonStateManager.updateToggleButtonsOnSelection(value.selection);
-    }
   }
 
   @override
@@ -244,9 +230,7 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     if (_hasFocus) {
       if (!_value.selection.isValid) {
         // Place cursor at the end if the selection is invalid when we receive focus.
-        final TextSelection validSelection = TextSelection.collapsed(offset: _value.text.length);
-        _handleSelectionChanged(validSelection, null);
-        toggleButtonStateManager.updateToggleButtonsOnSelection(validSelection);
+        _handleSelectionChanged(TextSelection.collapsed(offset: _value.text.length), null);
       }
     }
   }
@@ -266,10 +250,6 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
     TextEditingValue value = _value;
 
     value = textEditingDelta.apply(value);
-
-    if (widget.controller is ReplacementTextEditingController) {
-      (widget.controller as ReplacementTextEditingController).syncReplacementRanges(textEditingDelta);
-    }
 
     if (value != _value) {
       textEditingDeltaHistoryManager.updateTextEditingDeltaHistoryOnInput([textEditingDelta]);
@@ -534,18 +514,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
       }
     }
 
-    final bool selectionRangeChanged = _value.selection.start != value.selection.start
-        || _value.selection.end != value.selection.end;
-
     _value = value;
 
-    if (selectionChanged) {
-      _handleSelectionChanged(_value.selection, cause);
-
-      if (selectionRangeChanged) {
-        toggleButtonStateManager.updateToggleButtonsOnSelection(_value.selection);
-      }
-    }
+    if (selectionChanged) _handleSelectionChanged(_value.selection, cause);
   }
 
   /// For TextSelection.
