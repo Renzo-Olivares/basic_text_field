@@ -1,11 +1,13 @@
 import 'dart:math' as math;
-import 'package:deltaclientguide/main.dart';
-import 'package:deltaclientguide/replacements.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+
+import 'replacements.dart';
+import 'text_editing_delta_history_manager.dart';
+import 'toggle_button_state_manager.dart';
 
 /// Signature for the callback that reports when the user changes the selection
 /// (including the cursor location).
