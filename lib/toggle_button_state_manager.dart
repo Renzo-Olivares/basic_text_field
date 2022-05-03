@@ -1,6 +1,11 @@
 import 'package:flutter/widgets.dart';
 
+/// Signature for the callback that updates toggle button state when the user changes the selection
+/// (including the cursor location).
 typedef UpdateToggleButtonsStateOnSelectionChangedCallback = void Function(TextSelection selection);
+
+/// Signature for the callback that updates toggle button state when the user
+/// presses the toggle button.
 typedef UpdateToggleButtonsStateOnButtonPressedCallback = void Function(int index);
 
 class ToggleButtonsStateManager extends InheritedWidget {
