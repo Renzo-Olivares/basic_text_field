@@ -25,7 +25,6 @@ void main() {
 
         // Elements on the main screen
         // Delta labels.
-        expect(find.byTooltip('The text that is being inserted or deleted'), findsOneWidget);
         expect(
             find.widgetWithText(Tooltip, "Delta Type"), findsOneWidget);
         expect(find.widgetWithText(Tooltip, "Delta Text"), findsOneWidget);
@@ -41,24 +40,18 @@ void main() {
         await tester.pumpAndSettle();
         expect(
             find.widgetWithText(TextEditingDeltaView, "NonTextUpdate"), findsOneWidget);
-        // // FABs
-        // expect(
-        //     find.widgetWithIcon(FloatingActionButton, Icons.add),
-        //     findsNWidgets(4));
-        // expect(find.widgetWithText(FloatingActionButton, "Create"),
-        //     findsOneWidget);
-        //
-        // // Cards
-        // expect(find.widgetWithText(Card, "Elevated"), findsOneWidget);
-        // expect(find.widgetWithText(Card, "Filled"), findsOneWidget);
-        // expect(find.widgetWithText(Card, "Outlined"), findsOneWidget);
-        //
-        // // Alert Dialog
-        // Finder dialogExample = find.widgetWithText(TextButton, "Open Dialog");
-        // await tester.scrollUntilVisible(
-        //   dialogExample,
-        //   500.0,
-        // );
-        // expect(dialogExample, findsOneWidget);
+
+        // Find tooltips.
+        expect(find.byTooltip('The text that is being inserted or deleted'), findsOneWidget);
+        expect(find.byTooltip('The type of text input that is occurring. Check out the documentation for TextEditingDelta for more information.'), findsOneWidget);
+        expect(find.byTooltip('The offset in the text where the text input is occurring.'), findsOneWidget);
+        expect(find.byTooltip('The new text selection range after the text input has occurred.'), findsOneWidget);
+
+        // About Dialog
+        expect(
+            find.widgetWithIcon(IconButton, Icons.info_outline), findsOneWidget);
+        await tester.tap(find.widgetWithIcon(IconButton, Icons.info_outline));
+        await tester.pumpAndSettle();
+        expect(find.widgetWithText(Center, 'About'), findsOneWidget);
       });
 }
