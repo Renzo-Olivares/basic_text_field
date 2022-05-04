@@ -56,11 +56,9 @@ class TextEditingInlineSpanReplacement {
   TextEditingInlineSpanReplacement? onDelete(TextEditingDeltaDeletion delta) {
     final TextRange deletedRange = delta.deletedRange;
     final int deletedLength = delta.textDeleted.length;
-    print('replacement $range deletionRange $deletedRange');
 
     if (range.start >= deletedRange.start
         && (range.start < deletedRange.end && range.end > deletedRange.end)) {
-      print('first case');
       return copy(
           range: TextRange(
               start: deletedRange.end - deletedLength,
@@ -69,7 +67,6 @@ class TextEditingInlineSpanReplacement {
       );
     } else if ((range.start < deletedRange.start && range.end > deletedRange.start)
         && range.end <= deletedRange.end) {
-      print('second case');
       return copy(
         range: TextRange(
             start: range.start,
@@ -77,7 +74,6 @@ class TextEditingInlineSpanReplacement {
         ),
       );
     } else if (range.start < deletedRange.start && range.end > deletedRange.end) {
-      print('third case');
       return copy(
         range: TextRange(
           start: range.start,
@@ -85,11 +81,8 @@ class TextEditingInlineSpanReplacement {
         ),
       );
     } else if (range.start >= deletedRange.start && range.end <= deletedRange.end) {
-      print('removal case');
-      // remove attribute.
       return null;
     } else if (range.start > deletedRange.start && range.start >= deletedRange.end) {
-      print('fifth case');
       return copy(
         range: TextRange(
           start: range.start - deletedLength,
@@ -97,7 +90,6 @@ class TextEditingInlineSpanReplacement {
         ),
       );
     } else if (range.end <= deletedRange.start && range.end < deletedRange.end) {
-      print('sixth case');
       return copy(
         range: TextRange(
           start: range.start,
@@ -105,19 +97,16 @@ class TextEditingInlineSpanReplacement {
         ),
       );
     }
-    print('Deletion - finished adjusting replacement');
+
     return null;
   }
 
   TextEditingInlineSpanReplacement? onInsertion(TextEditingDeltaInsertion delta) {
     final int insertionOffset = delta.insertionOffset;
     final int insertedLength = delta.textInserted.length;
-    print('replacement $range insertionOffset $insertionOffset');
 
     if (range.end == insertionOffset) {
-      print('case 0');
       if (expand) {
-        print('expand');
         return copy(
           range: TextRange(
             start: range.start,
@@ -125,7 +114,6 @@ class TextEditingInlineSpanReplacement {
           ),
         );
       } else {
-        print('non expand');
         return copy(
           range: TextRange(
             start: range.start,
@@ -134,7 +122,6 @@ class TextEditingInlineSpanReplacement {
         );
       }
     } if (range.start < insertionOffset && range.end < insertionOffset) {
-      print('case1');
       return copy(
         range: TextRange(
           start: range.start,
@@ -142,7 +129,6 @@ class TextEditingInlineSpanReplacement {
         ),
       );
     } else if (range.start >= insertionOffset && range.end > insertionOffset) {
-      print('case2');
       return copy(
         range: TextRange(
           start: range.start + insertedLength,
@@ -150,7 +136,6 @@ class TextEditingInlineSpanReplacement {
         ),
       );
     } else if (range.start < insertionOffset && range.end > insertionOffset) {
-      print('case3');
       return copy(
         range: TextRange(
           start: range.start,
@@ -159,7 +144,6 @@ class TextEditingInlineSpanReplacement {
       );
     }
 
-    print('Insertion - finished adjusting replacement');
     return null;
   }
 
@@ -175,11 +159,8 @@ class TextEditingInlineSpanReplacement {
         .length - delta.replacementText.length
         : delta.replacementText.length - delta.textReplaced.length;
 
-    print('replacement $range replacedRange $replacedRange');
-
     if (range.start >= replacedRange.start
         && (range.start < replacedRange.end && range.end > replacedRange.end)) {
-      print('first case');
       if (replacementShortenedText) {
         return [
           copy(
@@ -210,7 +191,6 @@ class TextEditingInlineSpanReplacement {
       }
     } else if ((range.start < replacedRange.start && range.end > replacedRange.start)
         && range.end <= replacedRange.end) {
-      print('second case');
       return [
         copy(
           range: TextRange(
@@ -220,7 +200,6 @@ class TextEditingInlineSpanReplacement {
         ),
       ];
     } else if (range.start < replacedRange.start && range.end > replacedRange.end) {
-      print('third case');
       if (replacementShortenedText) {
         return [
           copy(
@@ -268,11 +247,9 @@ class TextEditingInlineSpanReplacement {
         ];
       }
     } else if (range.start >= replacedRange.start && range.end <= replacedRange.end) {
-      print('removal case');
       // remove attribute.
       return null;
     } else if (range.start > replacedRange.start && range.start >= replacedRange.end) {
-      print('fifth case');
       if (replacementShortenedText) {
         return [
           copy(
@@ -295,7 +272,6 @@ class TextEditingInlineSpanReplacement {
         return [this];
       }
     } else if (range.end <= replacedRange.start && range.end < replacedRange.end) {
-      print('sixth case');
       return [
         copy(
           range: TextRange(
@@ -306,20 +282,15 @@ class TextEditingInlineSpanReplacement {
       ];
     }
 
-    print('Replacement - finished adjusting replacement');
-
     return null;
   }
 
   TextEditingInlineSpanReplacement? onNonTextUpdate(TextEditingDeltaNonTextUpdate delta) {
     if (range.isCollapsed) {
-      print('isCollapsed');
       if (range.start != delta.selection.start && range.end != delta.selection.end) {
-        print('removing');
         return null;
       }
     }
-    print('NonTextUpdate - finished adjusting replacement');
     return this;
   }
 
@@ -444,23 +415,17 @@ class ReplacementTextEditingController extends TextEditingController {
       late final TextEditingInlineSpanReplacement? mutatedReplacement;
 
       if (delta is TextEditingDeltaInsertion) {
-        print('Insertion - adjusting replacement');
         mutatedReplacement = replacements![i].onInsertion(delta);
       } else if (delta is TextEditingDeltaDeletion) {
-        print('Deletion - adjusting replacement');
         mutatedReplacement = replacements![i].onDelete(delta);
       } else if (delta is TextEditingDeltaReplacement) {
-        print('Replacement - adjusting replacement');
         List<TextEditingInlineSpanReplacement>? newReplacements;
         newReplacements = replacements![i].onReplacement(delta);
 
         if (newReplacements != null) {
           if (newReplacements.length == 1) {
-            print('here');
             mutatedReplacement = newReplacements[0];
           } else {
-            print('whut');
-            print(newReplacements);
             mutatedReplacement = null;
             toAdd.addAll(newReplacements);
           }
@@ -468,12 +433,10 @@ class ReplacementTextEditingController extends TextEditingController {
           mutatedReplacement = null;
         }
       } else if (delta is TextEditingDeltaNonTextUpdate) {
-        print('NonTextUpdate - adjusting replacement');
         mutatedReplacement = replacements![i].onNonTextUpdate(delta);
       }
 
       if (mutatedReplacement == null) {
-        print('remove');
         toRemove.add(replacements![i]);
       } else {
         replacements![i] = mutatedReplacement;
@@ -481,7 +444,6 @@ class ReplacementTextEditingController extends TextEditingController {
     }
 
     for (final TextEditingInlineSpanReplacement replacementToRemove in toRemove) {
-      print('deleting replacements');
       replacements!.remove(replacementToRemove);
     }
 
@@ -500,25 +462,6 @@ class ReplacementTextEditingController extends TextEditingController {
 
     // Keep a mapping of TextRanges to the InlineSpan to replace it with.
     final Map<TextRange, InlineSpan> rangeSpanMapping = <TextRange, InlineSpan>{};
-
-    // If the composing range is out of range for the current text, ignore it to
-    // preserve the tree integrity, otherwise in release mode a RangeError will
-    // be thrown and this EditableText will be built with a broken subtree.
-    //
-    // Add composing region as a replacement to a TextSpan with underline.
-    if (!composingRegionReplaceable
-        && value.isComposingRangeValid
-        && withComposing) {
-      _addToMappingWithOverlaps((String value, TextRange range) {
-        final TextStyle composingStyle = style != null
-            ? style.merge(const TextStyle(decoration: TextDecoration.underline))
-            : const TextStyle(decoration: TextDecoration.underline);
-        return TextSpan(
-          style: composingStyle,
-          text: value,
-        );
-      }, value.composing, rangeSpanMapping, value.text);
-    }
 
     // Iterate through TextEditingInlineSpanReplacements, handling overlapping
     // replacements and mapping them towards a generated InlineSpan.

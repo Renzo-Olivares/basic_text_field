@@ -1174,6 +1174,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
           selection: value.selection,
           composing: value.composing,
         );
+        if (widget.controller is ReplacementTextEditingController) {
+          (widget.controller as ReplacementTextEditingController).syncReplacementRanges(selectionUpdate);
+        }
         textEditingDeltaHistoryManager.updateTextEditingDeltaHistoryOnInput([selectionUpdate]);
       }
     }
@@ -1570,6 +1573,247 @@ class TextEditingInlineSpanReplacement {
 
   bool expand;
 
+  TextEditingInlineSpanReplacement? onDelete(TextEditingDeltaDeletion delta) {
+    final TextRange deletedRange = delta.deletedRange;
+    final int deletedLength = delta.textDeleted.length;
+
+    if (range.start >= deletedRange.start
+        && (range.start < deletedRange.end && range.end > deletedRange.end)) {
+      return copy(
+        range: TextRange(
+          start: deletedRange.end - deletedLength,
+          end: range.end - deletedLength,
+        ),
+      );
+    } else if ((range.start < deletedRange.start && range.end > deletedRange.start)
+        && range.end <= deletedRange.end) {
+      return copy(
+        range: TextRange(
+          start: range.start,
+          end: deletedRange.start,
+        ),
+      );
+    } else if (range.start < deletedRange.start && range.end > deletedRange.end) {
+      return copy(
+        range: TextRange(
+          start: range.start,
+          end: range.end - deletedLength,
+        ),
+      );
+    } else if (range.start >= deletedRange.start && range.end <= deletedRange.end) {
+      return null;
+    } else if (range.start > deletedRange.start && range.start >= deletedRange.end) {
+      return copy(
+        range: TextRange(
+          start: range.start - deletedLength,
+          end: range.end - deletedLength,
+        ),
+      );
+    } else if (range.end <= deletedRange.start && range.end < deletedRange.end) {
+      return copy(
+        range: TextRange(
+          start: range.start,
+          end: range.end,
+        ),
+      );
+    }
+
+    return null;
+  }
+
+  TextEditingInlineSpanReplacement? onInsertion(TextEditingDeltaInsertion delta) {
+    final int insertionOffset = delta.insertionOffset;
+    final int insertedLength = delta.textInserted.length;
+
+    if (range.end == insertionOffset) {
+      if (expand) {
+        return copy(
+          range: TextRange(
+            start: range.start,
+            end: range.end + insertedLength,
+          ),
+        );
+      } else {
+        return copy(
+          range: TextRange(
+            start: range.start,
+            end: range.end,
+          ),
+        );
+      }
+    } if (range.start < insertionOffset && range.end < insertionOffset) {
+      return copy(
+        range: TextRange(
+          start: range.start,
+          end: range.end,
+        ),
+      );
+    } else if (range.start >= insertionOffset && range.end > insertionOffset) {
+      return copy(
+        range: TextRange(
+          start: range.start + insertedLength,
+          end: range.end + insertedLength,
+        ),
+      );
+    } else if (range.start < insertionOffset && range.end > insertionOffset) {
+      return copy(
+        range: TextRange(
+          start: range.start,
+          end: range.end + insertedLength,
+        ),
+      );
+    }
+
+    return null;
+  }
+
+  List<TextEditingInlineSpanReplacement>? onReplacement(TextEditingDeltaReplacement delta) {
+    final TextRange replacedRange = delta.replacedRange;
+    final bool replacementShortenedText = delta.replacementText.length <
+        delta.textReplaced.length;
+    final bool replacementLengthenedText = delta.replacementText.length >
+        delta.textReplaced.length;
+    final bool replacementEqualLength = delta.replacementText.length ==
+        delta.textReplaced.length;
+    final int changedOffset = replacementShortenedText ? delta.textReplaced
+        .length - delta.replacementText.length
+        : delta.replacementText.length - delta.textReplaced.length;
+
+    if (range.start >= replacedRange.start
+        && (range.start < replacedRange.end && range.end > replacedRange.end)) {
+      if (replacementShortenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: replacedRange.end - changedOffset,
+              end: range.end - changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementLengthenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: replacedRange.end + changedOffset,
+              end: range.end + changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementEqualLength) {
+        return [
+          copy(
+            range: TextRange(
+              start: replacedRange.end,
+              end: range.end,
+            ),
+          ),
+        ];
+      }
+    } else if ((range.start < replacedRange.start && range.end > replacedRange.start)
+        && range.end <= replacedRange.end) {
+      return [
+        copy(
+          range: TextRange(
+            start: range.start,
+            end: replacedRange.start,
+          ),
+        ),
+      ];
+    } else if (range.start < replacedRange.start && range.end > replacedRange.end) {
+      if (replacementShortenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start,
+              end: replacedRange.start,
+            ),
+          ),
+          copy(
+            range: TextRange(
+              start: replacedRange.end - changedOffset,
+              end: range.end - changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementLengthenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start,
+              end: replacedRange.start,
+            ),
+          ),
+          copy(
+            range: TextRange(
+              start: replacedRange.end + changedOffset,
+              end: range.end + changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementEqualLength) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start,
+              end: replacedRange.start,
+            ),
+          ),
+          copy(
+            range: TextRange(
+              start: replacedRange.end,
+              end: range.end,
+            ),
+          ),
+        ];
+      }
+    } else if (range.start >= replacedRange.start && range.end <= replacedRange.end) {
+      // remove attribute.
+      return null;
+    } else if (range.start > replacedRange.start && range.start >= replacedRange.end) {
+      if (replacementShortenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start - changedOffset,
+              end: range.end - changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementLengthenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start + changedOffset,
+              end: range.end + changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementEqualLength) {
+        return [this];
+      }
+    } else if (range.end <= replacedRange.start && range.end < replacedRange.end) {
+      return [
+        copy(
+          range: TextRange(
+            start: range.start,
+            end: range.end,
+          ),
+        ),
+      ];
+    }
+
+    return null;
+  }
+
+  TextEditingInlineSpanReplacement? onNonTextUpdate(TextEditingDeltaNonTextUpdate delta) {
+    if (range.isCollapsed) {
+      if (range.start != delta.selection.start && range.end != delta.selection.end) {
+        return null;
+      }
+    }
+    return this;
+  }
+
   /// Creates a new replacement with all properties copied except for range, which
   /// is updated to the specified value.
   TextEditingInlineSpanReplacement copy({TextRange? range, bool? expand}) {
@@ -1684,321 +1928,46 @@ class ReplacementTextEditingController extends TextEditingController {
 
     if (text.isEmpty) replacements!.clear();
 
-    List<TextEditingInlineSpanReplacement> updatedReplacements = [];
     List<TextEditingInlineSpanReplacement> toRemove = [];
+    List<TextEditingInlineSpanReplacement> toAdd = [];
 
-    for (final TextEditingInlineSpanReplacement replacement
-    in replacements!) {
-      // Syncing insertions.
+    for (int i = 0; i < replacements!.length; i++) {
+      late final TextEditingInlineSpanReplacement? mutatedReplacement;
+
       if (delta is TextEditingDeltaInsertion) {
-        if (delta.insertionOffset == replacement.range.end
-            && delta.insertionOffset == replacement.range.start) {
-          if (replacement.expand) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start,
-                  end: replacement.range.end + delta.textInserted.length,
-                ),
-              ),
-            );
-          }
-        } else if (delta.insertionOffset > replacement.range.start
-            && delta.insertionOffset < replacement.range.end) {
-          // Update replacement where insertion offset is inclusively within replacement range.
-          updatedReplacements.add(
-            replacement.copy(
-              range: TextRange(
-                start: replacement.range.start,
-                end: replacement.range.end + delta.textInserted.length,
-              ),
-            ),
-          );
-        } else if (delta.insertionOffset > replacement.range.end) {
-          // Update replacements that happen before insertion offset.
-          updatedReplacements.add(replacement);
-        } else if (delta.insertionOffset < replacement.range.start) {
-          // Update replacements that happen after the insertion offset.
-          updatedReplacements.add(
-            replacement.copy(
-              range: TextRange(
-                start: replacement.range.start + delta.textInserted.length,
-                end: replacement.range.end + delta.textInserted.length,
-              ),
-            ),
-          );
-        } else if (delta.insertionOffset == replacement.range.start
-            || delta.insertionOffset == replacement.range.end) {
-          if (delta.insertionOffset == replacement.range.start) {
-            // Updating replacement where insertion offset touches front edge of replacement range.
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start + delta.textInserted.length,
-                  end: replacement.range.end + delta.textInserted.length,
-                ),
-              ),
-            );
-          } else if (delta.insertionOffset == replacement.range.end) {
-            // Updating replacement where insertion offset touches back edge of replacement range.
-            if (replacement.expand) {
-              updatedReplacements.add(
-                replacement.copy(
-                  range: TextRange(
-                    start: replacement.range.start,
-                    end: replacement.range.end + delta.textInserted.length,
-                  ),
-                ),
-              );
-            } else {
-              updatedReplacements.add(replacement);
-            }
-          }
-        }
+        mutatedReplacement = replacements![i].onInsertion(delta);
       } else if (delta is TextEditingDeltaDeletion) {
-        // Syncing deletions.
-        if (delta.deletedRange.start >= replacement.range.start
-            && delta.deletedRange.end <= replacement.range.end) {
-          // Update replacement ranges directly inclusively associated with deleted range.
-          if (replacement.range.start !=
-              replacement.range.end - delta.textDeleted.length) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start,
-                  end: replacement.range.end - delta.textDeleted.length,
-                ),
-              ),
-            );
-          } else {
-            // Removing replacement.
-            toRemove.add(replacement);
-          }
-        } else if (delta.deletedRange.start > replacement.range.end
-            && delta.deletedRange.end > replacement.range.end) {
-          // Replacements that occurred before deletion range do not need updating.
-          updatedReplacements.add(replacement);
-        } else if (delta.deletedRange.end < replacement.range.start) {
-          // Updating replacements that occurred after the deleted range.
-          updatedReplacements.add(
-            replacement.copy(
-              range: TextRange(
-                start: replacement.range.start - delta.textDeleted.length,
-                end: replacement.range.end - delta.textDeleted.length,
-              ),
-            ),
-          );
-        } else if (delta.deletedRange.start == replacement.range.start
-            || delta.deletedRange.start == replacement.range.end
-            || delta.deletedRange.end == replacement.range.start
-            || delta.deletedRange.end == replacement.range.end) {
-          if (delta.deletedRange.start == replacement.range.end
-              || delta.deletedRange.end == replacement.range.end) {
-            // Updating replacement where the deleted range touches back edge of replacement range
-            if (delta.deletedRange.start == replacement.range.end) {
-              updatedReplacements.add(replacement);
-            }
-
-            if (delta.deletedRange.end == replacement.range.end) {
-              if (replacement.expand) {
-                final int end = replacement.range.end -
-                    delta.textDeleted.length;
-                if (replacement.range.start == end) {
-                  toRemove.add(replacement);
-                } else {
-                  updatedReplacements.add(
-                    replacement.copy(
-                      range: TextRange(
-                        start: replacement.range.start,
-                        end: end,
-                      ),
-                    ),
-                  );
-                }
-              } else {
-                if (replacement.range.start == replacement.range.end) {
-                  toRemove.add(replacement);
-                } else {
-                  updatedReplacements.add(replacement);
-                }
-              }
-            }
-          } else if (delta.deletedRange.start == replacement.range.start
-              || delta.deletedRange.end == replacement.range.start) {
-            // Updating replacement where the deleted range touches front edge of replacement range.
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start - delta.textDeleted.length,
-                  end: replacement.range.end - delta.textDeleted.length,
-                ),
-              ),
-            );
-          }
-        } else if (delta.deletedRange.start <= replacement.range.start
-            && delta.deletedRange.end >= replacement.range.end) {
-          toRemove.add(replacement);
-        }
+        mutatedReplacement = replacements![i].onDelete(delta);
       } else if (delta is TextEditingDeltaReplacement) {
-        final bool replacementShortenedText = delta.replacementText.length < delta.textReplaced.length;
-        final bool replacementLengthenedText = delta.replacementText.length > delta.textReplaced.length;
-        final bool replacementEqualLength = delta.replacementText.length == delta.textReplaced.length;
-        final int changedOffset = replacementShortenedText ? delta.textReplaced.length - delta.replacementText.length : delta.replacementText.length - delta.textReplaced.length;
+        List<TextEditingInlineSpanReplacement>? newReplacements;
+        newReplacements = replacements![i].onReplacement(delta);
 
-        // Syncing replacements.
-        if (delta.replacedRange.start >= replacement.range.start
-            && delta.replacedRange.end <= replacement.range.end) {
-          // Update replacement ranges directly inclusively associated with replaced range.
-          final int replacementEndOffset = replacement.range.end;
-          final int replacementStartOffset = replacement.range.start;
-
-          if (replacementLengthenedText) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacementStartOffset,
-                  end: delta.replacedRange.start,
-                ),
-              ),
-            );
-
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: delta.replacedRange.end + changedOffset,
-                  end: replacementEndOffset + changedOffset,
-                ),
-              ),
-            );
+        if (newReplacements != null) {
+          if (newReplacements.length == 1) {
+            mutatedReplacement = newReplacements[0];
+          } else {
+            mutatedReplacement = null;
+            toAdd.addAll(newReplacements);
           }
-
-          if (replacementShortenedText) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacementStartOffset,
-                  end: delta.replacedRange.start,
-                ),
-              ),
-            );
-
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: delta.replacedRange.end - changedOffset,
-                  end: replacementEndOffset - changedOffset,
-                ),
-              ),
-            );
-          }
-
-          if (replacementEqualLength) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacementStartOffset,
-                  end: delta.replacedRange.start,
-                ),
-              ),
-            );
-
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: delta.replacedRange.end,
-                  end: replacementEndOffset,
-                ),
-              ),
-            );
-          }
-        } else if (delta.replacedRange.start > replacement.range.end
-            && delta.replacedRange.end > replacement.range.end) {
-          // Replacements that occurred before replaced range do not need updating.
-          updatedReplacements.add(replacement);
-        } else if (delta.replacedRange.end < replacement.range.start) {
-          // Updating replacements that occurred after the replaced range.
-          if (replacementLengthenedText) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start + changedOffset,
-                  end: replacement.range.end + changedOffset,
-                ),
-              ),
-            );
-          }
-
-          if (replacementShortenedText) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start - changedOffset,
-                  end: replacement.range.end - changedOffset,
-                ),
-              ),
-            );
-          }
-
-          if (replacementEqualLength) {
-            updatedReplacements.add(replacement);
-          }
-        } else if (delta.replacedRange.start == replacement.range.start
-            || delta.replacedRange.start == replacement.range.end
-            || delta.replacedRange.end == replacement.range.start
-            || delta.replacedRange.end == replacement.range.end) {
-          if (delta.replacedRange.start == replacement.range.end
-              || delta.replacedRange.end == replacement.range.end) {
-            // Updating replacement where the replaced range touches back edge of replacement range.
-            updatedReplacements.add(replacement);
-          } else if (delta.replacedRange.start == replacement.range.start
-              || delta.replacedRange.end == replacement.range.start) {
-            // Updating replacement where the replaced range touches front edge of replacement range.
-            if (replacementLengthenedText) {
-              updatedReplacements.add(
-                replacement.copy(
-                  range: TextRange(
-                    start: replacement.range.start + changedOffset,
-                    end: replacement.range.end + changedOffset,
-                  ),
-                ),
-              );
-            }
-
-            if (replacementShortenedText) {
-              updatedReplacements.add(
-                replacement.copy(
-                  range: TextRange(
-                    start: replacement.range.start - changedOffset,
-                    end: replacement.range.end - changedOffset,
-                  ),
-                ),
-              );
-            }
-
-            if (replacementEqualLength) {
-              updatedReplacements.add(replacement);
-            }
-          }
-        } else if (delta.replacedRange.start <= replacement.range.start
-            && delta.replacedRange.end >= replacement.range.end) {
-          toRemove.add(replacement);
+        } else {
+          mutatedReplacement = null;
         }
       } else if (delta is TextEditingDeltaNonTextUpdate) {
-        // Sync non text updates.
-        // Nothing to do here.
+        mutatedReplacement = replacements![i].onNonTextUpdate(delta);
+      }
+
+      if (mutatedReplacement == null) {
+        toRemove.add(replacements![i]);
+      } else {
+        replacements![i] = mutatedReplacement;
       }
     }
 
-    if (updatedReplacements.isNotEmpty) {
-      replacements!.clear();
-      replacements!.addAll(updatedReplacements);
+    for (final TextEditingInlineSpanReplacement replacementToRemove in toRemove) {
+      replacements!.remove(replacementToRemove);
     }
 
-    if (updatedReplacements.isEmpty) {
-      for (final TextEditingInlineSpanReplacement replacementToRemove in toRemove) {
-        replacements!.remove(replacementToRemove);
-      }
-    }
+    replacements!.addAll(toAdd);
   }
 
   @override
@@ -2013,25 +1982,6 @@ class ReplacementTextEditingController extends TextEditingController {
 
     // Keep a mapping of TextRanges to the InlineSpan to replace it with.
     final Map<TextRange, InlineSpan> rangeSpanMapping = <TextRange, InlineSpan>{};
-
-    // If the composing range is out of range for the current text, ignore it to
-    // preserve the tree integrity, otherwise in release mode a RangeError will
-    // be thrown and this EditableText will be built with a broken subtree.
-    //
-    // Add composing region as a replacement to a TextSpan with underline.
-    if (!composingRegionReplaceable
-        && value.isComposingRangeValid
-        && withComposing) {
-      _addToMappingWithOverlaps((String value, TextRange range) {
-        final TextStyle composingStyle = style != null
-            ? style.merge(const TextStyle(decoration: TextDecoration.underline))
-            : const TextStyle(decoration: TextDecoration.underline);
-        return TextSpan(
-          style: composingStyle,
-          text: value,
-        );
-      }, value.composing, rangeSpanMapping, value.text);
-    }
 
     // Iterate through TextEditingInlineSpanReplacements, handling overlapping
     // replacements and mapping them towards a generated InlineSpan.
