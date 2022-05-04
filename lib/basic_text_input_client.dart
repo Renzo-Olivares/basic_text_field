@@ -532,6 +532,9 @@ class BasicTextInputClientState extends State<BasicTextInputClient>
             selection: value.selection,
             composing: value.composing,
         );
+        if (widget.controller is ReplacementTextEditingController) {
+          (widget.controller as ReplacementTextEditingController).syncReplacementRanges(selectionUpdate);
+        }
         textEditingDeltaHistoryManager.updateTextEditingDeltaHistoryOnInput([selectionUpdate]);
       }
     }

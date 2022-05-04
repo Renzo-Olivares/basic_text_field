@@ -53,6 +53,276 @@ class TextEditingInlineSpanReplacement {
 
   bool expand;
 
+  TextEditingInlineSpanReplacement? onDelete(TextEditingDeltaDeletion delta) {
+    final TextRange deletedRange = delta.deletedRange;
+    final int deletedLength = delta.textDeleted.length;
+    print('replacement $range deletionRange $deletedRange');
+
+    if (range.start >= deletedRange.start
+        && (range.start < deletedRange.end && range.end > deletedRange.end)) {
+      print('first case');
+      return copy(
+          range: TextRange(
+              start: deletedRange.end - deletedLength,
+              end: range.end - deletedLength,
+          ),
+      );
+    } else if ((range.start < deletedRange.start && range.end > deletedRange.start)
+        && range.end <= deletedRange.end) {
+      print('second case');
+      return copy(
+        range: TextRange(
+            start: range.start,
+            end: deletedRange.start,
+        ),
+      );
+    } else if (range.start < deletedRange.start && range.end > deletedRange.end) {
+      print('third case');
+      return copy(
+        range: TextRange(
+          start: range.start,
+          end: range.end - deletedLength,
+        ),
+      );
+    } else if (range.start >= deletedRange.start && range.end <= deletedRange.end) {
+      print('removal case');
+      // remove attribute.
+      return null;
+    } else if (range.start > deletedRange.start && range.start >= deletedRange.end) {
+      print('fifth case');
+      return copy(
+        range: TextRange(
+          start: range.start - deletedLength,
+          end: range.end - deletedLength,
+        ),
+      );
+    } else if (range.end <= deletedRange.start && range.end < deletedRange.end) {
+      print('sixth case');
+      return copy(
+        range: TextRange(
+          start: range.start,
+          end: range.end,
+        ),
+      );
+    }
+    print('Deletion - finished adjusting replacement');
+    return null;
+  }
+
+  TextEditingInlineSpanReplacement? onInsertion(TextEditingDeltaInsertion delta) {
+    final int insertionOffset = delta.insertionOffset;
+    final int insertedLength = delta.textInserted.length;
+    print('replacement $range insertionOffset $insertionOffset');
+
+    if (range.end == insertionOffset) {
+      print('case 0');
+      if (expand) {
+        print('expand');
+        return copy(
+          range: TextRange(
+            start: range.start,
+            end: range.end + insertedLength,
+          ),
+        );
+      } else {
+        print('non expand');
+        return copy(
+          range: TextRange(
+            start: range.start,
+            end: range.end,
+          ),
+        );
+      }
+    } if (range.start < insertionOffset && range.end < insertionOffset) {
+      print('case1');
+      return copy(
+        range: TextRange(
+          start: range.start,
+          end: range.end,
+        ),
+      );
+    } else if (range.start >= insertionOffset && range.end > insertionOffset) {
+      print('case2');
+      return copy(
+        range: TextRange(
+          start: range.start + insertedLength,
+          end: range.end + insertedLength,
+        ),
+      );
+    } else if (range.start < insertionOffset && range.end > insertionOffset) {
+      print('case3');
+      return copy(
+        range: TextRange(
+          start: range.start,
+          end: range.end + insertedLength,
+        ),
+      );
+    }
+
+    print('Insertion - finished adjusting replacement');
+    return null;
+  }
+
+  List<TextEditingInlineSpanReplacement>? onReplacement(TextEditingDeltaReplacement delta) {
+    final TextRange replacedRange = delta.replacedRange;
+    final bool replacementShortenedText = delta.replacementText.length <
+        delta.textReplaced.length;
+    final bool replacementLengthenedText = delta.replacementText.length >
+        delta.textReplaced.length;
+    final bool replacementEqualLength = delta.replacementText.length ==
+        delta.textReplaced.length;
+    final int changedOffset = replacementShortenedText ? delta.textReplaced
+        .length - delta.replacementText.length
+        : delta.replacementText.length - delta.textReplaced.length;
+
+    print('replacement $range replacedRange $replacedRange');
+
+    if (range.start >= replacedRange.start
+        && (range.start < replacedRange.end && range.end > replacedRange.end)) {
+      print('first case');
+      if (replacementShortenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: replacedRange.end - changedOffset,
+              end: range.end - changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementLengthenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: replacedRange.end + changedOffset,
+              end: range.end + changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementEqualLength) {
+        return [
+          copy(
+            range: TextRange(
+              start: replacedRange.end,
+              end: range.end,
+            ),
+          ),
+        ];
+      }
+    } else if ((range.start < replacedRange.start && range.end > replacedRange.start)
+        && range.end <= replacedRange.end) {
+      print('second case');
+      return [
+        copy(
+          range: TextRange(
+            start: range.start,
+            end: replacedRange.start,
+          ),
+        ),
+      ];
+    } else if (range.start < replacedRange.start && range.end > replacedRange.end) {
+      print('third case');
+      if (replacementShortenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start,
+              end: replacedRange.start,
+            ),
+          ),
+          copy(
+            range: TextRange(
+              start: replacedRange.end - changedOffset,
+              end: range.end - changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementLengthenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start,
+              end: replacedRange.start,
+            ),
+          ),
+          copy(
+            range: TextRange(
+              start: replacedRange.end + changedOffset,
+              end: range.end + changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementEqualLength) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start,
+              end: replacedRange.start,
+            ),
+          ),
+          copy(
+            range: TextRange(
+              start: replacedRange.end,
+              end: range.end,
+            ),
+          ),
+        ];
+      }
+    } else if (range.start >= replacedRange.start && range.end <= replacedRange.end) {
+      print('removal case');
+      // remove attribute.
+      return null;
+    } else if (range.start > replacedRange.start && range.start >= replacedRange.end) {
+      print('fifth case');
+      if (replacementShortenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start - changedOffset,
+              end: range.end - changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementLengthenedText) {
+        return [
+          copy(
+            range: TextRange(
+              start: range.start + changedOffset,
+              end: range.end + changedOffset,
+            ),
+          ),
+        ];
+      } else if (replacementEqualLength) {
+        return [this];
+      }
+    } else if (range.end <= replacedRange.start && range.end < replacedRange.end) {
+      print('sixth case');
+      return [
+        copy(
+          range: TextRange(
+            start: range.start,
+            end: range.end,
+          ),
+        ),
+      ];
+    }
+
+    print('Replacement - finished adjusting replacement');
+
+    return null;
+  }
+
+  TextEditingInlineSpanReplacement? onNonTextUpdate(TextEditingDeltaNonTextUpdate delta) {
+    if (range.isCollapsed) {
+      print('isCollapsed');
+      if (range.start != delta.selection.start && range.end != delta.selection.end) {
+        print('removing');
+        return null;
+      }
+    }
+    print('NonTextUpdate - finished adjusting replacement');
+    return this;
+  }
+
   /// Creates a new replacement with all properties copied except for range, which
   /// is updated to the specified value.
   TextEditingInlineSpanReplacement copy({TextRange? range, bool? expand}) {
@@ -167,321 +437,55 @@ class ReplacementTextEditingController extends TextEditingController {
 
     if (text.isEmpty) replacements!.clear();
 
-    List<TextEditingInlineSpanReplacement> updatedReplacements = [];
     List<TextEditingInlineSpanReplacement> toRemove = [];
+    List<TextEditingInlineSpanReplacement> toAdd = [];
 
-    for (final TextEditingInlineSpanReplacement replacement
-    in replacements!) {
-      // Syncing insertions.
+    for (int i = 0; i < replacements!.length; i++) {
+      late final TextEditingInlineSpanReplacement? mutatedReplacement;
+
       if (delta is TextEditingDeltaInsertion) {
-        if (delta.insertionOffset == replacement.range.end
-            && delta.insertionOffset == replacement.range.start) {
-          if (replacement.expand) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start,
-                  end: replacement.range.end + delta.textInserted.length,
-                ),
-              ),
-            );
-          }
-        } else if (delta.insertionOffset > replacement.range.start
-            && delta.insertionOffset < replacement.range.end) {
-          // Update replacement where insertion offset is inclusively within replacement range.
-          updatedReplacements.add(
-            replacement.copy(
-              range: TextRange(
-                start: replacement.range.start,
-                end: replacement.range.end + delta.textInserted.length,
-              ),
-            ),
-          );
-        } else if (delta.insertionOffset > replacement.range.end) {
-          // Update replacements that happen before insertion offset.
-          updatedReplacements.add(replacement);
-        } else if (delta.insertionOffset < replacement.range.start) {
-          // Update replacements that happen after the insertion offset.
-          updatedReplacements.add(
-            replacement.copy(
-              range: TextRange(
-                start: replacement.range.start + delta.textInserted.length,
-                end: replacement.range.end + delta.textInserted.length,
-              ),
-            ),
-          );
-        } else if (delta.insertionOffset == replacement.range.start
-            || delta.insertionOffset == replacement.range.end) {
-          if (delta.insertionOffset == replacement.range.start) {
-            // Updating replacement where insertion offset touches front edge of replacement range.
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start + delta.textInserted.length,
-                  end: replacement.range.end + delta.textInserted.length,
-                ),
-              ),
-            );
-          } else if (delta.insertionOffset == replacement.range.end) {
-            // Updating replacement where insertion offset touches back edge of replacement range.
-            if (replacement.expand) {
-              updatedReplacements.add(
-                replacement.copy(
-                  range: TextRange(
-                    start: replacement.range.start,
-                    end: replacement.range.end + delta.textInserted.length,
-                  ),
-                ),
-              );
-            } else {
-              updatedReplacements.add(replacement);
-            }
-          }
-        }
+        print('Insertion - adjusting replacement');
+        mutatedReplacement = replacements![i].onInsertion(delta);
       } else if (delta is TextEditingDeltaDeletion) {
-        // Syncing deletions.
-        if (delta.deletedRange.start >= replacement.range.start
-            && delta.deletedRange.end <= replacement.range.end) {
-          // Update replacement ranges directly inclusively associated with deleted range.
-          if (replacement.range.start !=
-              replacement.range.end - delta.textDeleted.length) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start,
-                  end: replacement.range.end - delta.textDeleted.length,
-                ),
-              ),
-            );
-          } else {
-            // Removing replacement.
-            toRemove.add(replacement);
-          }
-        } else if (delta.deletedRange.start > replacement.range.end
-            && delta.deletedRange.end > replacement.range.end) {
-          // Replacements that occurred before deletion range do not need updating.
-          updatedReplacements.add(replacement);
-        } else if (delta.deletedRange.end < replacement.range.start) {
-          // Updating replacements that occurred after the deleted range.
-          updatedReplacements.add(
-            replacement.copy(
-              range: TextRange(
-                start: replacement.range.start - delta.textDeleted.length,
-                end: replacement.range.end - delta.textDeleted.length,
-              ),
-            ),
-          );
-        } else if (delta.deletedRange.start == replacement.range.start
-            || delta.deletedRange.start == replacement.range.end
-            || delta.deletedRange.end == replacement.range.start
-            || delta.deletedRange.end == replacement.range.end) {
-          if (delta.deletedRange.start == replacement.range.end
-              || delta.deletedRange.end == replacement.range.end) {
-            // Updating replacement where the deleted range touches back edge of replacement range
-            if (delta.deletedRange.start == replacement.range.end) {
-              updatedReplacements.add(replacement);
-            }
-
-            if (delta.deletedRange.end == replacement.range.end) {
-              if (replacement.expand) {
-                final int end = replacement.range.end -
-                    delta.textDeleted.length;
-                if (replacement.range.start == end) {
-                  toRemove.add(replacement);
-                } else {
-                  updatedReplacements.add(
-                    replacement.copy(
-                      range: TextRange(
-                        start: replacement.range.start,
-                        end: end,
-                      ),
-                    ),
-                  );
-                }
-              } else {
-                if (replacement.range.start == replacement.range.end) {
-                  toRemove.add(replacement);
-                } else {
-                  updatedReplacements.add(replacement);
-                }
-              }
-            }
-          } else if (delta.deletedRange.start == replacement.range.start
-              || delta.deletedRange.end == replacement.range.start) {
-            // Updating replacement where the deleted range touches front edge of replacement range.
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start - delta.textDeleted.length,
-                  end: replacement.range.end - delta.textDeleted.length,
-                ),
-              ),
-            );
-          }
-        } else if (delta.deletedRange.start <= replacement.range.start
-            && delta.deletedRange.end >= replacement.range.end) {
-          toRemove.add(replacement);
-        }
+        print('Deletion - adjusting replacement');
+        mutatedReplacement = replacements![i].onDelete(delta);
       } else if (delta is TextEditingDeltaReplacement) {
-        final bool replacementShortenedText = delta.replacementText.length < delta.textReplaced.length;
-        final bool replacementLengthenedText = delta.replacementText.length > delta.textReplaced.length;
-        final bool replacementEqualLength = delta.replacementText.length == delta.textReplaced.length;
-        final int changedOffset = replacementShortenedText ? delta.textReplaced.length - delta.replacementText.length : delta.replacementText.length - delta.textReplaced.length;
+        print('Replacement - adjusting replacement');
+        List<TextEditingInlineSpanReplacement>? newReplacements;
+        newReplacements = replacements![i].onReplacement(delta);
 
-        // Syncing replacements.
-        if (delta.replacedRange.start >= replacement.range.start
-            && delta.replacedRange.end <= replacement.range.end) {
-          // Update replacement ranges directly inclusively associated with replaced range.
-          final int replacementEndOffset = replacement.range.end;
-          final int replacementStartOffset = replacement.range.start;
-
-          if (replacementLengthenedText) {
-            updatedReplacements.add(
-                replacement.copy(
-                    range: TextRange(
-                        start: replacementStartOffset,
-                        end: delta.replacedRange.start,
-                    ),
-                ),
-            );
-
-            updatedReplacements.add(
-                replacement.copy(
-                    range: TextRange(
-                        start: delta.replacedRange.end + changedOffset,
-                        end: replacementEndOffset + changedOffset,
-                    ),
-                ),
-            );
+        if (newReplacements != null) {
+          if (newReplacements.length == 1) {
+            print('here');
+            mutatedReplacement = newReplacements[0];
+          } else {
+            print('whut');
+            print(newReplacements);
+            mutatedReplacement = null;
+            toAdd.addAll(newReplacements);
           }
-
-          if (replacementShortenedText) {
-            updatedReplacements.add(
-                replacement.copy(
-                    range: TextRange(
-                        start: replacementStartOffset,
-                        end: delta.replacedRange.start,
-                    ),
-                ),
-            );
-
-            updatedReplacements.add(
-                replacement.copy(
-                    range: TextRange(
-                        start: delta.replacedRange.end - changedOffset,
-                        end: replacementEndOffset - changedOffset,
-                    ),
-                ),
-            );
-          }
-
-          if (replacementEqualLength) {
-            updatedReplacements.add(
-                replacement.copy(
-                    range: TextRange(
-                        start: replacementStartOffset,
-                        end: delta.replacedRange.start,
-                    ),
-                ),
-            );
-
-            updatedReplacements.add(
-                replacement.copy(
-                    range: TextRange(
-                      start: delta.replacedRange.end,
-                      end: replacementEndOffset,
-                    ),
-                ),
-            );
-          }
-        } else if (delta.replacedRange.start > replacement.range.end
-            && delta.replacedRange.end > replacement.range.end) {
-          // Replacements that occurred before replaced range do not need updating.
-          updatedReplacements.add(replacement);
-        } else if (delta.replacedRange.end < replacement.range.start) {
-          // Updating replacements that occurred after the replaced range.
-          if (replacementLengthenedText) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start + changedOffset,
-                  end: replacement.range.end + changedOffset,
-                ),
-              ),
-            );
-          }
-
-          if (replacementShortenedText) {
-            updatedReplacements.add(
-              replacement.copy(
-                range: TextRange(
-                  start: replacement.range.start - changedOffset,
-                  end: replacement.range.end - changedOffset,
-                ),
-              ),
-            );
-          }
-
-          if (replacementEqualLength) {
-            updatedReplacements.add(replacement);
-          }
-        } else if (delta.replacedRange.start == replacement.range.start
-            || delta.replacedRange.start == replacement.range.end
-            || delta.replacedRange.end == replacement.range.start
-            || delta.replacedRange.end == replacement.range.end) {
-          if (delta.replacedRange.start == replacement.range.end
-              || delta.replacedRange.end == replacement.range.end) {
-            // Updating replacement where the replaced range touches back edge of replacement range.
-            updatedReplacements.add(replacement);
-          } else if (delta.replacedRange.start == replacement.range.start
-              || delta.replacedRange.end == replacement.range.start) {
-            // Updating replacement where the replaced range touches front edge of replacement range.
-            if (replacementLengthenedText) {
-              updatedReplacements.add(
-                replacement.copy(
-                  range: TextRange(
-                    start: replacement.range.start + changedOffset,
-                    end: replacement.range.end + changedOffset,
-                  ),
-                ),
-              );
-            }
-
-            if (replacementShortenedText) {
-              updatedReplacements.add(
-                replacement.copy(
-                  range: TextRange(
-                    start: replacement.range.start - changedOffset,
-                    end: replacement.range.end - changedOffset,
-                  ),
-                ),
-              );
-            }
-
-            if (replacementEqualLength) {
-              updatedReplacements.add(replacement);
-            }
-          }
-        } else if (delta.replacedRange.start <= replacement.range.start
-            && delta.replacedRange.end >= replacement.range.end) {
-          toRemove.add(replacement);
+        } else {
+          mutatedReplacement = null;
         }
       } else if (delta is TextEditingDeltaNonTextUpdate) {
-        // Sync non text updates.
-        // Nothing to do here.
+        print('NonTextUpdate - adjusting replacement');
+        mutatedReplacement = replacements![i].onNonTextUpdate(delta);
+      }
+
+      if (mutatedReplacement == null) {
+        print('remove');
+        toRemove.add(replacements![i]);
+      } else {
+        replacements![i] = mutatedReplacement;
       }
     }
 
-    if (updatedReplacements.isNotEmpty) {
-      replacements!.clear();
-      replacements!.addAll(updatedReplacements);
+    for (final TextEditingInlineSpanReplacement replacementToRemove in toRemove) {
+      print('deleting replacements');
+      replacements!.remove(replacementToRemove);
     }
 
-    if (updatedReplacements.isEmpty) {
-      for (final TextEditingInlineSpanReplacement replacementToRemove in toRemove) {
-        replacements!.remove(replacementToRemove);
-      }
-    }
+    replacements!.addAll(toAdd);
   }
 
   @override
